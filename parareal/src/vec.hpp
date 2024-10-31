@@ -2,6 +2,7 @@
 #define PARAREAL_VEC_H
 
 #include <algorithm>
+#include <limits>
 
 
 namespace vec {
@@ -116,6 +117,16 @@ namespace vec {
 
 		T norm() const {
 			return std::sqrt(norm_squared());
+		}
+
+		T max() const {
+			T res = std::numeric_limits<T>::lowest();
+			for (std::size_t d = 0; d < D; ++d) {
+				if (res < components_[d]) {
+					res = components_[d];
+				}
+			}
+			return res;
 		}
 
 		bool has_nan() const {

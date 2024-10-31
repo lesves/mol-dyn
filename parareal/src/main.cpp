@@ -4,7 +4,6 @@
 #include <mpi.h>
 #include <cstdlib>
 
-#include "config.hpp"
 #include "state.hpp"
 #include "integration.hpp"
 
@@ -30,13 +29,6 @@ int main(int argc, char** argv) {
 
 		return MPI_Finalize();*/
 
-		config::Config cfg(
-			1,
-			1,
-			1,
-			0,
-			1
-		);
 		state::State initial;
 
 		initial.add_particle(
@@ -55,17 +47,12 @@ int main(int argc, char** argv) {
 			1
 		);
 
-		types::real dt = 0.001;
+		auto states = integration::parareal(0, 10, initial, 1000, 10, 1e-4);
 
 		std::ofstream out("out.txt");
 
-		auto in = integration::Integrator(integration::euler_step, 0, 10, 100, cfg, initial);
-		const state::State* state;
-
-		for (; !in.done(); state = in.step()) {
-			std::cout << "ehlo " << in.iter() << "\n";
-			if (in.iter() % 100 == 0)
-				dump(out, *state);
+		for (auto it = states.cbegin(); it != states.cend(); ++it) {
+			dump(out, *it);
 		}
 
 		out << std::flush;

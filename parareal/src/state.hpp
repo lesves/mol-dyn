@@ -1,7 +1,13 @@
 #ifndef PARAREAL_STATE_H
 #define PARAREAL_STATE_H
 
+#include <algorithm>
+#include <vector>
+
 #include "types.hpp"
+
+#define G 1
+#define SMOOTHING_EPS 0
 
 
 namespace state {
@@ -25,7 +31,7 @@ namespace state {
 			return x.size();
 		}
 
-		void compute_force(std::size_t i, const config::Config& cfg) {
+		void compute_force(std::size_t i) {
 			a[i].clear();
 
 			for (std::size_t j = 0; j < size(); ++j) {
@@ -36,11 +42,22 @@ namespace state {
 				auto diff = x[i]-x[j];
 				auto dist = diff.norm();
 
-				auto smoothed = std::sqrt(dist*dist + cfg.eps*cfg.eps);
+				auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
 
-				a[i] += -cfg.G * m[j] * diff / std::pow(smoothed, (types::real)3);
-				//pot[i] = -cfg.G * m[i] * m[j] / smoothed / (types::real)2;
+				a[i] += -G * m[j] * diff / std::pow(smoothed, (types::real)3);
+				//pot[i] = -G * m[i] * m[j] / smoothed / (types::real)2;
 			}
+		}
+
+		types::real distance(const State& other) {
+			types::real diff = 0;
+
+			for (std::size_t i = 0; i < size(); ++i) {
+				diff = std::max<types::real>(diff, (x[i]-other.x[i]).norm());
+				diff = std::max<types::real>(diff, (v[i]-other.v[i]).norm());
+			}
+
+			return diff;
 		}
 	};
 }
