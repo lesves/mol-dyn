@@ -12,19 +12,19 @@
 
 namespace state {
 	struct State {
-		types::real t;
-		std::vector<types::vec> x;
-		std::vector<types::vec> v;
-		std::vector<types::vec> a;
-		std::vector<types::real> m;
+		double t;
+		std::vector<types::vec3> x;
+		std::vector<types::vec3> v;
+		std::vector<types::vec3> a;
+		std::vector<double> m;
 
 		State() {}
 
-		void add_particle(types::vec pos, types::vec vel, types::real mass) {
+		void add_particle(types::vec3 pos, types::vec3 vel, double mass) {
 			x.push_back(pos);
 			v.push_back(vel);
 			m.push_back(mass);
-			a.push_back(types::vec());
+			a.push_back(types::vec3());
 		}
 
 		std::size_t size() const {
@@ -44,20 +44,42 @@ namespace state {
 
 				auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
 
-				a[i] += -G * m[j] * diff / std::pow(smoothed, (types::real)3);
-				//pot[i] = -G * m[i] * m[j] / smoothed / (types::real)2;
+				a[i] += -G * m[j] * diff / std::pow(smoothed, 3.);
+				//pot[i] = -G * m[i] * m[j] / smoothed / (double)2;
 			}
 		}
 
-		types::real distance(const State& other) {
-			types::real diff = 0;
+		double distance(const State& other) {
+			double diff = 0;
 
 			for (std::size_t i = 0; i < size(); ++i) {
-				diff = std::max<types::real>(diff, (x[i]-other.x[i]).norm());
-				diff = std::max<types::real>(diff, (v[i]-other.v[i]).norm());
+				diff = std::max<double>(diff, (x[i]-other.x[i]).norm());
+				diff = std::max<double>(diff, (v[i]-other.v[i]).norm());
 			}
 
 			return diff;
+		}
+
+		// dump to arrays for MPI
+		void serialize(double* state_xs, double* state_vs, double* state_ms) {
+			for (std::size_t i = 0; i < size(); ++i) {
+				for (std::size_t d = 0; d < 3; ++d) {
+					state_xs[d+i*size()] = x[i][d];
+					state_vs[d+i*size()] = v[i][d];
+				}
+				state_ms[i] = m[i];
+			}
+		}
+
+		// replaces the particles inside with given particles, must be the same size!
+		void deserialize(double* state_xs, double* state_vs, double* state_ms) {
+			for (std::size_t i = 0; i < size(); ++i) {
+				for (std::size_t d = 0; d < 3; ++d) {
+					x[i][d] = state_xs[d+i*size()];
+					v[i][d] = state_vs[d+i*size()];
+				}
+				m[i] = state_ms[i];
+			}
 		}
 	};
 }

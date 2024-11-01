@@ -4,11 +4,8 @@
 #include "vec.hpp"
 
 namespace types {
-	using real = double;
-	using vec2 = vec::Vector<real, 2>;
-	using vec3 = vec::Vector<real, 3>;
-
-	using vec = vec3;
+	using vec2 = vec::Vector<double, 2>;
+	using vec3 = vec::Vector<double, 3>;
 }
 
 #endif
