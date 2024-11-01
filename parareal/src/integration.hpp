@@ -93,7 +93,8 @@ namespace integration {
 		std::uint64_t num_segments, 
 		std::uint64_t num_iters, 
 		double eps,
-		std::function<void(double, state::State&)> coarse_solver = euler_step
+		std::function<void(double, state::State&)> coarse_solver = euler_step,
+		std::function<void(double, double, state::State&)> fine_solver = parareal_fine
 	) {
 		// compute basic segment information
 		if (num_segments % n_ranks != 0) {
@@ -162,7 +163,7 @@ namespace integration {
 			for (std::size_t worker_seg = 0; worker_seg < worker_size; ++worker_seg) {
 				worker_state.deserialize(worker_state_xs + worker_seg*num_particles*3, worker_state_vs + worker_seg*num_particles*3, worker_state_ms + worker_seg*num_particles);
 
-				parareal_fine(worker_t0s[worker_seg], worker_Ts[worker_seg], worker_state);
+				fine_solver(worker_t0s[worker_seg], worker_Ts[worker_seg], worker_state);
 
 				worker_state.serialize(worker_state_xs + worker_seg*num_particles*3, worker_state_vs + worker_seg*num_particles*3, worker_state_ms + worker_seg*num_particles);
 			}
