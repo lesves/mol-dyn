@@ -16,49 +16,64 @@ void dump(std::ofstream& out, const state::State& state) {
 }
 
 
+void show(const std::vector<state::State>& states) {
+	std::ofstream out("out.txt");
+
+	for (auto it = states.cbegin(); it != states.cend(); ++it) {
+		dump(out, *it);
+	}
+
+	out << std::flush;
+
+	system("python3 vis.py out.txt");
+}
+
+
 int main(int argc, char** argv) {
 	try {
-		/*MPI_Status status;
+		MPI_Status status;
 		MPI_Init(&argc, &argv);
 
 		int rank, n_ranks;
 		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
 		MPI_Comm_size(MPI_COMM_WORLD, &n_ranks);
 
-		std::cout << "r" << rank << "/" << n_ranks << "\n";
-
-		return MPI_Finalize();*/
+		std::cout << "Rank " << rank << "/" << n_ranks << " running\n";
 
 		state::State initial;
 
 		initial.add_particle(
-			types::vec({0.97000436, -0.24308753, 0}),
-			types::vec({0.466203685, 0.43236573, 0}),
+			types::vec3({0.97000436, -0.24308753, 0}),
+			types::vec3({0.466203685, 0.43236573, 0}),
 			1
 		);
 		initial.add_particle(
-			types::vec({0, 0, 0}),
-			types::vec({-0.93240737,-0.86473146}),
+			types::vec3({0, 0, 0}),
+			types::vec3({-0.93240737,-0.86473146}),
 			1
 		);
 		initial.add_particle(
-			types::vec({-0.97000436, 0.24308753}),
-			types::vec({0.466203685, 0.43236573}),
+			types::vec3({-0.97000436, 0.24308753}),
+			types::vec3({0.466203685, 0.43236573}),
 			1
 		);
 
-		auto states = integration::parareal(0, 10, initial, 1000, 10, 1e-4);
+		auto res = integration::parareal(
+			rank, n_ranks, // MPI
+			0,             // start time
+			10,            // end time
+			initial,       // initial state
+			1000,          // number of segments (must be divisible by the number of ranks)
+			10,            // maximum of parareal iters, 
+			1e-4           // eps for convergence
+		);
+		
 
-		std::ofstream out("out.txt");
-
-		for (auto it = states.cbegin(); it != states.cend(); ++it) {
-			dump(out, *it);
+		if (rank == 0) {
+			show(res);
 		}
 
-		out << std::flush;
-
-		system("python3 vis.py out.txt");
-
+		return MPI_Finalize();
 	} catch (const std::exception& e) {
 		std::cout << "Error: " << e.what() << std::endl;
 		return 1;
