@@ -9,10 +9,13 @@
 
 
 void dump(std::ofstream& out, const state::State& state) {
+	auto E_k = state.kinetic_energy();
+	auto E_p = state.potential_energy();
+
 	for (std::size_t i = 0; i < state.size(); ++i) {
 		out << state.x[i][0] << " " << state.x[i][1] << " ";
 	}
-	out << "\n";
+	out << E_k << " " << E_p << "\n";
 }
 
 
@@ -25,7 +28,9 @@ void show(const std::vector<state::State>& states) {
 
 	out << std::flush;
 
+	#ifdef VIS
 	system("python3 vis.py out.txt");
+	#endif
 }
 
 
@@ -58,20 +63,39 @@ int main(int argc, char** argv) {
 			1
 		);
 
+		#ifdef COMPARISON_SERIAL
+
+		if (rank == 0) {
+			std::ofstream out("out.txt");
+			state::State state = initial;
+			for (uint64_t i = 0; i < 1000*1000; ++i) {
+				if (i % 1000 == 0) {
+					dump(out, state);
+				}
+				integration::rk4_step(10./(1000.*1000.), state);
+			}
+			out << std::flush;
+			#ifdef VIS
+			system("python3 vis.py out.txt");
+			#endif
+		}
+		#else
+
 		auto res = integration::parareal(
 			rank, n_ranks, // MPI
 			0,             // start time
 			10,            // end time
 			initial,       // initial state
 			1000,          // number of segments (must be divisible by the number of ranks)
-			10,            // maximum of parareal iters, 
+			100,           // maximum of parareal iters, 
 			1e-4           // eps for convergence
 		);
-		
 
 		if (rank == 0) {
 			show(res);
 		}
+
+		#endif
 
 		return MPI_Finalize();
 	} catch (const std::exception& e) {
