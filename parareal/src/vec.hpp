@@ -3,6 +3,8 @@
 
 #include <algorithm>
 #include <limits>
+#include <array>
+#include <cmath>
 
 
 namespace vec {
