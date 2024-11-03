@@ -12,4 +12,4 @@ include_directories(SYSTEM ${MPI_INCLUDE_PATH})
 target_link_libraries(parareal ${MPI_C_LIBRARIES})
 
 configure_file(../vis.py vis.py COPYONLY)
-file(CONFIGURE OUTPUT .gitignore CONTENT "*")
+execute_process(COMMAND sh -c "echo \"*\" > .gitignore")
