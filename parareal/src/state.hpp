@@ -49,7 +49,38 @@ namespace state {
 			}
 		}
 
-		double distance(const State& other) {
+		double potential_energy() const {
+			double energy;
+
+			for (std::size_t i = 0; i < size(); ++i) {
+				for (std::size_t j = 0; j < size(); ++j) {
+					if (i == j) {
+						continue;
+					}
+
+					auto diff = x[i]-x[j];
+					auto dist = diff.norm();
+
+					auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
+
+					energy += -G * m[i] * m[j] / smoothed / 2.;
+				}
+			}
+
+			return energy;
+		}
+
+		double kinetic_energy() const {
+			double energy;
+
+			for (std::size_t i = 0; i < size(); ++i) {
+				energy += 0.5 * m[i]*v[i].norm_squared();
+			}
+
+			return energy;
+		}
+
+		double distance(const State& other) const {
 			double diff = 0;
 
 			for (std::size_t i = 0; i < size(); ++i) {
@@ -61,7 +92,7 @@ namespace state {
 		}
 
 		// dump to arrays for MPI
-		void serialize(double* state_xs, double* state_vs, double* state_ms) {
+		void serialize(double* state_xs, double* state_vs, double* state_ms) const {
 			for (std::size_t i = 0; i < size(); ++i) {
 				for (std::size_t d = 0; d < 3; ++d) {
 					state_xs[d+i*size()] = x[i][d];

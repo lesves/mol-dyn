@@ -18,13 +18,17 @@ namespace integration {
 		}
 	}
 
+	void setup_acc(state::State& state) {
+		for (std::size_t i = 0; i < state.size(); ++i) {
+			state.compute_force(i);
+		}
+	}
+
 	void leapfrog_step(double dt, state::State& state) {
 		for (std::size_t i = 0; i < state.size(); ++i) {
 			state.v[i] += state.a[i]*0.5*dt;
 			state.x[i] += state.v[i]*dt;
 			state.compute_force(i);
-		}
-		for (std::size_t i = 0; i < state.size(); ++i) {
 			state.v[i] += state.a[i]*0.5*dt;
 		}
 		state.t += dt;
@@ -42,7 +46,6 @@ namespace integration {
 
 		state::State tmp = state;
 
-		tmp.t += dt/2;
 		for (std::size_t i = 0; i < tmp.size(); ++i) {
 			tmp.compute_force(i);
 
@@ -73,29 +76,37 @@ namespace integration {
 	        state.v[i] += (k1_v + 2.*k2_v + 2.*k3_v + k4_v)/6.;
 	        state.x[i] += (k1_x + 2.*k2_x + 2.*k3_x + k4_x)/6.;
 		}
+
+		state.t += dt;
 	}
 
-	void parareal_fine(double fine_t0, double fine_T, state::State& fine_u) {
-		// fine solver part
-		// TODO: RK45
-		constexpr std::uint64_t fine_num_iters = 100;
-		auto fine_dt = (fine_T-fine_t0)/(double)fine_num_iters;
-		for (auto i = 0; i < fine_num_iters; ++i) {
-			rk4_step(fine_dt, fine_u);
+	void rk4_1000iters(double t0, double T, state::State& state) {
+		constexpr std::uint64_t num_iters = 1000;
+
+		auto dt = (T-t0)/(double)num_iters;
+
+		for (auto i = 0; i < num_iters; ++i) {
+			rk4_step(dt, state);
 		}
-		// end of fine solver part
 	}
 
 	std::vector<state::State> parareal(
 		int rank, int n_ranks,
 		double t0, double T, 
-		const state::State& initial, 
+		const state::State& initial_, 
 		std::uint64_t num_segments, 
 		std::uint64_t num_iters, 
 		double eps,
-		std::function<void(double, state::State&)> coarse_solver = euler_step,
-		std::function<void(double, double, state::State&)> fine_solver = parareal_fine
+		std::function<void(double, state::State&)> coarse_step = leapfrog_step,
+		bool coarse_step_setup_acc = true,
+		std::function<void(double, double, state::State&)> fine_solver = rk4_1000iters
 	) {
+		// setup accelerations for methods like leapfrog
+		state::State initial = initial_;
+		if (coarse_step_setup_acc) {
+			setup_acc(initial);
+		}
+
 		// compute basic segment information
 		if (num_segments % n_ranks != 0) {
 			throw std::runtime_error("Number of segments must be divisible by the number of ranks");
@@ -108,11 +119,15 @@ namespace integration {
 
 		// storage for communication between ranks
 
-		double* t0s = new double[num_segments];
-		double* Ts = new double[num_segments];
-		double* state_xs = new double[num_segments*num_particles*3];
-		double* state_vs = new double[num_segments*num_particles*3];
-		double* state_ms = new double[num_segments*num_particles];
+		double *t0s, *Ts, *state_xs, *state_vs, *state_ms;
+
+		if (rank == 0) {
+			t0s = new double[num_segments];
+			Ts = new double[num_segments];
+			state_xs = new double[num_segments*num_particles*3];
+			state_vs = new double[num_segments*num_particles*3];
+			state_ms = new double[num_segments*num_particles];
+		}
 
 		double* worker_t0s = new double[worker_size];
 		double* worker_Ts = new double[worker_size];
@@ -126,19 +141,22 @@ namespace integration {
 		if (rank == 0) {
 			auto u = initial;
 			for (std::size_t seg = 1; seg < num_segments+1; ++seg) {
-				coarse_solver(segment_size, u);
+				coarse_step(segment_size, u);
 				states.push_back(u);
 			}
 		}
 
+		bool stop = false;
+
 		// main algorithm
 		for (std::uint64_t it = 1; it < num_iters+1; ++it) {
-			std::cout << "parareal iter=" << it << " ";
 			std::vector<state::State> states_new = {initial};
 
 			// encode data for sending to workers
 
 			if (rank == 0) {
+				std::cout << "parareal iter=" << it << " ";
+
 				for (std::size_t seg = 0; seg < num_segments; ++seg) {
 					auto fine_t0 = segment_size * (double)seg;
 					auto fine_T = segment_size * (double)(seg+1);
@@ -189,9 +207,15 @@ namespace integration {
 			if (rank == 0) {
 				for (std::size_t seg = 0; seg < num_segments; ++seg) {
 					auto a = states_new[seg];
-					coarse_solver(segment_size, a);
+					if (coarse_step_setup_acc) {
+						setup_acc(a);
+					}
+					coarse_step(segment_size, a);
 					auto c = states[seg];
-					coarse_solver(segment_size, c);
+					if (coarse_step_setup_acc) {
+						setup_acc(c);
+					}
+					coarse_step(segment_size, c);
 
 					for (std::size_t i = 0; i < states_new[seg+1].size(); ++i) {
 						states_new[seg+1].x[i] += a.x[i] - c.x[i];
@@ -203,19 +227,26 @@ namespace integration {
 				auto dist = states.back().distance(states_new.back());
 				std::cout << "distance=" << dist << std::endl;
 				if (dist < eps) {
-					break;
+					stop = true;
 				}
 
 				states = std::move(states_new);
 			}
+
+			MPI_Bcast(&stop, true, MPI_CXX_BOOL, 0, MPI_COMM_WORLD);
+			if (stop) {
+				break;
+			}
 		}
 
 		// deallocate
-		delete[] t0s;
-		delete[] Ts;
-		delete[] state_xs;
-		delete[] state_vs;
-		delete[] state_ms;
+		if (rank == 0) {
+			delete[] t0s;
+			delete[] Ts;
+			delete[] state_xs;
+			delete[] state_vs;
+			delete[] state_ms;
+		}
 
 		delete[] worker_t0s;
 		delete[] worker_Ts;
@@ -223,7 +254,11 @@ namespace integration {
 		delete[] worker_state_vs;
 		delete[] worker_state_ms;
 
-		return states;
+		if (rank == 0) {
+			return states;
+		} else {
+			return std::vector<state::State>();
+		}
 	}
 }
 
