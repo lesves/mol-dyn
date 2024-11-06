@@ -13,7 +13,7 @@ void dump(std::ofstream& out, const state::State& state) {
 	auto E_p = state.potential_energy();
 
 	for (std::size_t i = 0; i < state.size(); ++i) {
-		out << state.x[i][0] << " " << state.x[i][1] << " ";
+		out << state.x[i][0] << " " << state.x[i][1] << " " << state.x[i][2] << " ";
 	}
 	out << E_k << " " << E_p << "\n";
 }
