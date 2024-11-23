@@ -8,28 +8,30 @@ if len(sys.argv) <= 1:
 	sys.exit(1)
 
 data = np.loadtxt(sys.argv[1])
-data, energy = data[:, :-2], data[:, -2:]
+#data, energy = data[:, :-2], data[:, -2:]
 
 data = data.reshape((data.shape[0], data.shape[1]//3, 3))
 
 lim = 1.2*max(data[0, :, :].min(), data[0, :, :].max())
 
 ax = plt.axes(projection="3d")
-ax.set_xlim3d(-lim, lim)
-ax.set_ylim3d(-lim, lim)
-ax.set_zlim3d(-lim, lim)
+#ax.set_xlim3d(-lim, lim)
+#ax.set_ylim3d(-lim, lim)
+#ax.set_zlim3d(-lim, lim)
 
-for i in range(data.shape[1]):
-	ax.plot3D(data[:, i, 0], data[:, i, 1], data[:, i, 2], label=f"particle {i}")
+names = ["sun", "mercury", "venus", "earth", "mars", "jupiter", "saturn", "uranus", "neptune"]
+
+for i, name in zip(range(data.shape[1]), names):
+	ax.plot3D(data[:, i, 0], data[:, i, 1], data[:, i, 2], label=name)
 ax.legend()
 plt.show()
 
-ax = plt.axes()
-ax.plot(np.arange(len(energy)), energy[:, 0], label="kinetic energy")
-ax.plot(np.arange(len(energy)), energy[:, 1], label="potential energy")
-ax.plot(np.arange(len(energy)), energy.sum(axis=1), label="total energy")
-ax.legend()
-plt.show()
+#ax = plt.axes()
+#ax.plot(np.arange(len(energy)), energy[:, 0], label="kinetic energy")
+#ax.plot(np.arange(len(energy)), energy[:, 1], label="potential energy")
+#ax.plot(np.arange(len(energy)), energy.sum(axis=1), label="total energy")
+#ax.legend()
+#plt.show()
 
 ax = plt.axes()
 ax.set_xlim([-lim, lim])

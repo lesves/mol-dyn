@@ -7,7 +7,7 @@
 #include <cmath>
 
 
-namespace vec {
+namespace parareal {
 	using Dimension = std::size_t;
 
 	template<typename T, Dimension D>
@@ -16,7 +16,7 @@ namespace vec {
 		std::array<T, D> components_;
 
 	public:
-		static constexpr vec::Dimension Dim = D;
+		static constexpr Dimension Dim = D;
 
 		Vector() : components_({}) {};
 		Vector(const std::array<T, D>& components) : components_(components) {};

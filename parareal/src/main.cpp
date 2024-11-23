@@ -1,103 +1,68 @@
 #include <iostream>
-#include <fstream>
-#include <vector>
-#include <mpi.h>
-#include <cstdlib>
+#include <string>
+
+#include <boost/numeric/odeint.hpp>
+namespace odeint = boost::numeric::odeint;
+
+#include <boost/mpi/environment.hpp>
+#include <boost/mpi/communicator.hpp>
+namespace mpi = boost::mpi;
 
 #include "state.hpp"
-#include "integration.hpp"
-
-
-void dump(std::ofstream& out, const state::State& state) {
-	auto E_k = state.kinetic_energy();
-	auto E_p = state.potential_energy();
-
-	for (std::size_t i = 0; i < state.size(); ++i) {
-		out << state.x[i][0] << " " << state.x[i][1] << " " << state.x[i][2] << " ";
-	}
-	out << E_k << " " << E_p << "\n";
-}
-
-
-void show(const std::vector<state::State>& states) {
-	std::ofstream out("out.txt");
-
-	for (auto it = states.cbegin(); it != states.cend(); ++it) {
-		dump(out, *it);
-	}
-
-	out << std::flush;
-
-	#ifdef VIS
-	system("python3 vis.py out.txt");
-	#endif
-}
+#include "simulation.hpp"
+#include "parareal.hpp"
+#include "io.hpp"
 
 
 int main(int argc, char** argv) {
 	try {
-		MPI_Status status;
-		MPI_Init(&argc, &argv);
+		mpi::environment env;
+		mpi::communicator world;
+		std::cout << "Rank " << world.rank() << "/" << world.size() << " starting." << std::endl;
 
-		int rank, n_ranks;
-		MPI_Comm_rank(MPI_COMM_WORLD, &rank);
-		MPI_Comm_size(MPI_COMM_WORLD, &n_ranks);
+        std::vector<std::string> args(argv, argv+argc);
+        if (args.size() < 2) {
+            std::cerr << args[0] << ": Not enough arguments." << std::endl;
+            return 1;
+        }
 
-		std::cout << "Rank " << rank << "/" << n_ranks << " running\n";
+        auto [names, state, masses, G] = parareal::io::load(args[1]);
+        std::ofstream outfile("out.txt");
 
-		state::State initial;
+        const std::size_t N = names.size();
 
-		initial.add_particle(
-			types::vec3({0.97000436, -0.24308753, 0}),
-			types::vec3({0.466203685, 0.43236573, 0}),
-			1
-		);
-		initial.add_particle(
-			types::vec3({0, 0, 0}),
-			types::vec3({-0.93240737,-0.86473146}),
-			1
-		);
-		initial.add_particle(
-			types::vec3({-0.97000436, 0.24308753}),
-			types::vec3({0.466203685, 0.43236573}),
-			1
-		);
+        auto coarse_stepper = odeint::runge_kutta4<parareal::state::state_type>();
+        auto fine_stepper = odeint::make_controlled(1.0e-3, 1.0e-6, odeint::runge_kutta_dopri5<parareal::state::state_type>());
 
-		#ifdef COMPARISON_SERIAL
+        /*for (std::size_t i = 0; i < 366*10; ++i) {
+            odeint::integrate_adaptive(fine_stepper, parareal::simulation::simulation(G, masses), state, 10.*i, 10.*i + 10., 1.);
 
-		if (rank == 0) {
-			std::ofstream out("out.txt");
-			state::State state = initial;
-			for (uint64_t i = 0; i < 1000*1000; ++i) {
-				if (i % 1000 == 0) {
-					dump(out, state);
-				}
-				integration::rk4_step(10./(1000.*1000.), state);
-			}
-			out << std::flush;
-			#ifdef VIS
-			system("python3 vis.py out.txt");
-			#endif
-		}
-		#else
+            if (world.rank() == 0) {
+                parareal::io::output(state, outfile);
+            }
+        }*/
+        //odeint::integrate_adaptive(fine_stepper, parareal::simulation::simulation(G, masses), state, 0., 366., 10., [](const auto& state, const double t){ std::cout << t << std::endl;});
+        //parareal::io::output(state, outfile);
 
-		auto res = integration::parareal(
-			rank, n_ranks, // MPI
-			0,             // start time
-			10,            // end time
-			initial,       // initial state
-			1000,          // number of segments (must be divisible by the number of ranks)
-			100,           // maximum of parareal iters, 
-			1e-4           // eps for convergence
-		);
+        auto res = parareal::parareal(
+            world,
+            parareal::simulation::simulation(G, masses),
+            0., 366.*100.,
+            state,
+            100,
+            1000,
+            1e-4,
+            coarse_stepper,
+            fine_stepper,
+            366,
+            1.
+        );
 
-		if (rank == 0) {
-			show(res);
-		}
+        for (auto state : res) {
+            parareal::io::output(state, outfile);
+        }
 
-		#endif
-
-		return MPI_Finalize();
+		return 0;
 	} catch (const std::exception& e) {
 		std::cout << "Error: " << e.what() << std::endl;
 		return 1;

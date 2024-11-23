@@ -53,14 +53,14 @@ def rk4(f, t, dt, u):
 
 def simulate_parareal():
 	coarse_solver = rk4
-	fine_solver = functools.partial(rk45, rtol=1e-10)
-	ts, states = parareal(simulation, 0, 365*100, initial.flatten(), 100, 1000, 1e-6, coarse_solver=coarse_solver, fine_solver=fine_solver)
+	fine_solver = functools.partial(rk45, rtol=1e-6)
+	ts, states = parareal(simulation, 0, 366*100, initial.flatten(), 1000, 1000, 1e-6, coarse_solver=coarse_solver, fine_solver=fine_solver)
 
 	return states.reshape((-1,) + initial.shape)
 
 
 def simulate_rk45():
-	solver = RK45(simulation, 0, initial.flatten(), 365*100, rtol=1e-10)
+	solver = RK45(simulation, 0, initial.flatten(), 366*100, rtol=1e-6)
 
 	ts = []
 	states = []

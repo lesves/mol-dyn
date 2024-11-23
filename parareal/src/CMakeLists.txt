@@ -7,9 +7,13 @@ set(TARGET_NAME "parareal")
 add_executable(${TARGET_NAME} "main.cpp")
 set_property(TARGET ${TARGET_NAME} PROPERTY CXX_STANDARD 23)
 
-find_package(MPI)
-include_directories(SYSTEM ${MPI_INCLUDE_PATH})
-target_link_libraries(parareal ${MPI_C_LIBRARIES})
+find_package(Boost 1.66 COMPONENTS mpi REQUIRED)
+include_directories(${Boost_INCLUDE_DIRS}) 
+target_link_libraries(parareal ${Boost_LIBRARIES})
 
 configure_file(../vis.py vis.py COPYONLY)
 execute_process(COMMAND sh -c "echo \"*\" > .gitignore")
+
+set(SANITIZER_FLAGS -fsanitize=address,undefined,float-divide-by-zero,nullability -fno-omit-frame-pointer)
+target_compile_options(${TARGET_NAME} PRIVATE "${SANITIZER_FLAGS}")
+target_link_options(${TARGET_NAME} PRIVATE "${SANITIZER_FLAGS}")

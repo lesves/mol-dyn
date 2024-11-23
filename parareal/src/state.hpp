@@ -1,120 +1,66 @@
 #ifndef PARAREAL_STATE_H
 #define PARAREAL_STATE_H
 
-#include <algorithm>
 #include <vector>
 #include <cmath>
+#include "vec.hpp"
 
-#include "types.hpp"
+namespace parareal { namespace state {
+    using real = double;
+    using vec = parareal::Vector<double, 3>;
 
-#define G 1
-#define SMOOTHING_EPS 0
+    using state_type = std::vector<double>;
+    using mass_type = std::vector<real>;
 
 
-namespace state {
-	struct State {
-		double t;
-		std::vector<types::vec3> x;
-		std::vector<types::vec3> v;
-		std::vector<types::vec3> a;
-		std::vector<double> m;
+    std::size_t size(const state_type &state) {
+        return state.size()/2/3;
+    }
 
-		State() {}
+    vec get_pos(const state_type &state, std::size_t i) {
+        return vec({state[3*i + 0], state[3*i + 1], state[3*i + 2]});
+    }
 
-		void add_particle(types::vec3 pos, types::vec3 vel, double mass) {
-			x.push_back(pos);
-			v.push_back(vel);
-			m.push_back(mass);
-			a.push_back(types::vec3());
-		}
+    vec get_vel(const state_type &state, std::size_t i) {
+        const std::size_t N = size(state);
+        return vec({state[3*N + 3*i + 0], state[3*N + 3*i + 1], state[3*N + 3*i + 2]});
+    }
 
-		std::size_t size() const {
-			return x.size();
-		}
+    void set_pos(state_type &state, std::size_t i, vec val) {
+        state[3*i + 0] = val[0];
+        state[3*i + 1] = val[1];
+        state[3*i + 2] = val[2];
+    }
 
-		void compute_force(std::size_t i) {
-			a[i].clear();
+    void set_vel(state_type &state, std::size_t i, vec val) {
+        const std::size_t N = size(state);
+        state[3*N + 3*i + 0] = val[0];
+        state[3*N + 3*i + 1] = val[1];
+        state[3*N + 3*i + 2] = val[2];
+    }
 
-			for (std::size_t j = 0; j < size(); ++j) {
-				if (i == j) {
-					continue;
-				}
+    void clear_pos(state_type &state, std::size_t i) {
+        state[3*i + 0] = 0.;
+        state[3*i + 1] = 0.;
+        state[3*i + 2] = 0.;
+    }
 
-				auto diff = x[i]-x[j];
-				auto dist = diff.norm();
+    void clear_vel(state_type &state, std::size_t i) {
+        const std::size_t N = size(state);
+        state[3*N + 3*i + 0] = 0.;
+        state[3*N + 3*i + 1] = 0.;
+        state[3*N + 3*i + 2] = 0.;
+    }
 
-				auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
+    real distance(const state_type& a, const state_type& b) {
+        real res;
 
-				a[i] += -G * m[j] * diff / std::pow(smoothed, 3.);
-				//pot[i] = -G * m[i] * m[j] / smoothed / (double)2;
-			}
-		}
+        for (std::size_t i = 0; i < a.size(); ++i) {
+            res = std::max<real>(res, std::abs(a[i]-b[i]));
+        }
 
-		double potential_energy() const {
-			double energy;
-
-			for (std::size_t i = 0; i < size(); ++i) {
-				for (std::size_t j = 0; j < size(); ++j) {
-					if (i == j) {
-						continue;
-					}
-
-					auto diff = x[i]-x[j];
-					auto dist = diff.norm();
-
-					auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
-
-					energy += -G * m[i] * m[j] / smoothed / 2.;
-				}
-			}
-
-			return energy;
-		}
-
-		double kinetic_energy() const {
-			double energy;
-
-			for (std::size_t i = 0; i < size(); ++i) {
-				energy += 0.5 * m[i]*v[i].norm_squared();
-			}
-
-			return energy;
-		}
-
-		double distance(const State& other) const {
-			double diff = 0;
-
-			for (std::size_t i = 0; i < size(); ++i) {
-				diff = std::max<double>(diff, (x[i]-other.x[i]).norm());
-				diff = std::max<double>(diff, (v[i]-other.v[i]).norm());
-			}
-
-			return diff;
-		}
-
-		// dump to arrays for MPI
-		void serialize(double* state_xs, double* state_vs, double* state_ms) const {
-			for (std::size_t i = 0; i < size(); ++i) {
-				for (std::size_t d = 0; d < 3; ++d) {
-					state_xs[d+i*size()] = x[i][d];
-					state_vs[d+i*size()] = v[i][d];
-				}
-				state_ms[i] = m[i];
-			}
-		}
-
-		// replaces the particles inside with given particles, must be the same size!
-		void deserialize(double* state_xs, double* state_vs, double* state_ms) {
-			for (std::size_t i = 0; i < size(); ++i) {
-				for (std::size_t d = 0; d < 3; ++d) {
-					x[i][d] = state_xs[d+i*size()];
-					v[i][d] = state_vs[d+i*size()];
-				}
-				m[i] = state_ms[i];
-			}
-		}
-	};
-}
-
+        return res;
+    }
+} }
 
 #endif
