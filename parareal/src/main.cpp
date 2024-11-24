@@ -6,6 +6,7 @@
 
 #include "state.hpp"
 #include "integration.hpp"
+#define VIS
 
 
 void dump(std::ofstream& out, const state::State& state) {

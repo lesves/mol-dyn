@@ -13,7 +13,6 @@
 
 namespace state {
 	struct State {
-		double t;
 		std::vector<types::vec3> x;
 		std::vector<types::vec3> v;
 		std::vector<types::vec3> a;
