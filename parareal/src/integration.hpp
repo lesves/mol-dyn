@@ -8,8 +8,8 @@
 #include "state.hpp"
 
 namespace integration {
-	void euler_step(double dt, state::State& state) {
-		state.t += dt;
+	void euler_step(double t0, double t1, state::State& state) {
+		double dt = t1-t0;
 
 		for (std::size_t i = 0; i < state.size(); ++i) {
 			state.compute_force(i);
@@ -24,17 +24,20 @@ namespace integration {
 		}
 	}
 
-	void leapfrog_step(double dt, state::State& state) {
+	void leapfrog_step(double t0, double t1, state::State& state) {
+		double dt = t1-t0;
+
 		for (std::size_t i = 0; i < state.size(); ++i) {
 			state.v[i] += state.a[i]*0.5*dt;
 			state.x[i] += state.v[i]*dt;
 			state.compute_force(i);
 			state.v[i] += state.a[i]*0.5*dt;
 		}
-		state.t += dt;
 	}
 
-	void rk4_step(double dt, state::State& state) {
+	void rk4_step(double t0, double t1, state::State& state) {
+		double dt = t1-t0;
+
 		types::vec3 k1_v;
 		types::vec3 k2_v;
 		types::vec3 k3_v;
@@ -76,17 +79,16 @@ namespace integration {
 	        state.v[i] += (k1_v + 2.*k2_v + 2.*k3_v + k4_v)/6.;
 	        state.x[i] += (k1_x + 2.*k2_x + 2.*k3_x + k4_x)/6.;
 		}
-
-		state.t += dt;
 	}
 
 	void rk4_1000iters(double t0, double T, state::State& state) {
 		constexpr std::uint64_t num_iters = 1000;
 
 		auto dt = (T-t0)/(double)num_iters;
+		double t = t0;
 
 		for (auto i = 0; i < num_iters; ++i) {
-			rk4_step(dt, state);
+			rk4_step(t, t+dt, state);
 		}
 	}
 
@@ -97,7 +99,7 @@ namespace integration {
 		std::uint64_t num_segments, 
 		std::uint64_t num_iters, 
 		double eps,
-		std::function<void(double, state::State&)> coarse_step = leapfrog_step,
+		std::function<void(double, double, state::State&)> coarse_step = leapfrog_step,
 		bool coarse_step_setup_acc = true,
 		std::function<void(double, double, state::State&)> fine_solver = rk4_1000iters
 	) {
@@ -141,7 +143,7 @@ namespace integration {
 		if (rank == 0) {
 			auto u = initial;
 			for (std::size_t seg = 1; seg < num_segments+1; ++seg) {
-				coarse_step(segment_size, u);
+				coarse_step((seg-1)*segment_size, seg*segment_size, u);
 				states.push_back(u);
 			}
 		}
@@ -210,12 +212,12 @@ namespace integration {
 					if (coarse_step_setup_acc) {
 						setup_acc(a);
 					}
-					coarse_step(segment_size, a);
+					coarse_step(seg*segment_size, (seg+1)*segment_size, a);
 					auto c = states[seg];
 					if (coarse_step_setup_acc) {
 						setup_acc(c);
 					}
-					coarse_step(segment_size, c);
+					coarse_step(seg*segment_size, (seg+1)*segment_size, c);
 
 					for (std::size_t i = 0; i < states_new[seg+1].size(); ++i) {
 						states_new[seg+1].x[i] += a.x[i] - c.x[i];
