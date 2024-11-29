@@ -38,3 +38,21 @@ def simulation(t, state, masses=planets.masses):
 	res[0] = velocities
 	res[1] = accelerations
 	return res
+
+
+@njit
+def coarse_simulation(t, state, masses=planets.masses):
+	positions, velocities = state
+
+	accelerations = np.zeros_like(positions)
+
+	for i in range(1, len(masses)):
+		diff = positions[i]-positions[0]
+		dist = np.sqrt(diff[0]**2 + diff[1]**2 + diff[2]**2)
+
+		accelerations[i] += -planets.G * masses[0] * diff/dist**3
+
+	res = np.zeros_like(state)
+	res[0] = velocities
+	res[1] = accelerations
+	return res
