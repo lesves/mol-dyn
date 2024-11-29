@@ -5,7 +5,7 @@
 #include "types.hpp"
 #include "state.hpp"
 
-namespace io {
+namespace parareal { namespace io {
     void dump(std::ofstream& out, const state::State& state) {
         auto E_k = state.kinetic_energy();
         auto E_p = state.potential_energy();
@@ -16,8 +16,8 @@ namespace io {
         out << E_k << " " << E_p << "\n";
     }
 
-    void show(const std::vector<state::State>& states) {
-        std::ofstream out("out.txt");
+    void show(const std::string& fname, const std::vector<state::State>& states) {
+        std::ofstream out(fname);
 
         for (auto it = states.cbegin(); it != states.cend(); ++it) {
             dump(out, *it);
@@ -66,6 +66,6 @@ namespace io {
         state::Config cfg(G, std::move(mass));
         return { cfg, pos, vel };
     }
-}
+} }
 
 #endif

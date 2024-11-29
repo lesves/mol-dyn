@@ -10,7 +10,7 @@
 #define SMOOTHING_EPS 0
 
 
-namespace state {
+namespace parareal { namespace state {
 	class Config {
 	public:
 		double G = 1;
@@ -124,7 +124,7 @@ namespace state {
 			}
 		}
 	};
-}
+} }
 
 
 #endif

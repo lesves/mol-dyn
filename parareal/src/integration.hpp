@@ -3,16 +3,11 @@
 
 #include <vector>
 #include <functional>
-
 #include <omp.h>
-
-/*#include <boost/mpi/environment.hpp>
-#include <boost/mpi/communicator.hpp>
-namespace mpi = boost::mpi;*/
 
 #include "state.hpp"
 
-namespace integration {
+namespace parareal { namespace integration {
 	class EulerStep {
 	public:
 		void operator()(double t0, double t1, state::State& state) {
@@ -98,12 +93,13 @@ namespace integration {
 	class FixedStepSolver {
 	private:
 		std::size_t num_steps;
+		Step step;
 
 	public:
 		FixedStepSolver(std::size_t num_steps): num_steps(num_steps) {};
+		FixedStepSolver(std::size_t num_steps, const Step& step): num_steps(num_steps), step(step) {};
 
 		void operator()(double t0, double t1, state::State& state) {
-			Step step;
 			double dt = (t1-t0) / num_steps;
 
 			for (auto i = 0; i < num_steps; ++i) {
@@ -112,7 +108,6 @@ namespace integration {
 		}
 
 		std::vector<state::State> integrate_verbose(double t0, double t1, state::State& state) {
-			Step step;
 			double dt = (t1-t0) / num_steps;
 			std::vector<state::State> res;
 
@@ -124,6 +119,16 @@ namespace integration {
 			return res;
 		}
 	};
+
+	template<typename Step>
+	FixedStepSolver<FixedStepSolver<Step>> solver_with_log_period(std::size_t num_steps, std::size_t log_period) {
+		if (num_steps % log_period) {
+			throw std::runtime_error("num_steps must be divisible by log_period");
+		}
+		auto inner = FixedStepSolver<Step>(log_period);
+		auto num_steps_ = num_steps/log_period;
+		return FixedStepSolver<FixedStepSolver<Step>>(num_steps_, inner);
+	}
 
 	template<typename CoarseSolver, typename FineSolver>
 	std::vector<state::State> parareal(
@@ -204,6 +209,6 @@ namespace integration {
 
 		return res;
 	}
-}
+} }
 
 #endif

@@ -1,64 +1,79 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
-#include <cstdlib>
 
-/*#include <boost/mpi/environment.hpp>
-#include <boost/mpi/communicator.hpp>
-namespace mpi = boost::mpi;*/
+#include <cstdlib>
+#include <sstream>
+
+#include <cxxopts.hpp>
 
 #include "state.hpp"
 #include "integration.hpp"
 #include "io.hpp"
-//#define USE_PARAREAL
 
 
 int main(int argc, char** argv) {
 	try {
-		/*mpi::environment env;
-		mpi::communicator world;
+		cxxopts::Options options("parareal", "Simulate the solar system using the parallel-in-time algorithm, parareal");
+	    options.add_options()
+	        ("i,in", "Input file", cxxopts::value<std::string>())
+	        ("o,out", "Output file", cxxopts::value<std::string>())
+	        ("n,nseg", "Number of segments", cxxopts::value<std::size_t>())
+	        ("t,time", "Simulation length", cxxopts::value<double>())
+	        ("coarse-steps", "Number of steps of the coarse integrator", cxxopts::value<std::size_t>())
+	        ("fine-steps", "Number of steps of the coarse integrator", cxxopts::value<std::size_t>())
+	        ("max-iters", "Maximum number of parareal iterations", cxxopts::value<std::size_t>()->default_value("1000"))
+	        ("eps", "Epsilon for parareal convergence", cxxopts::value<double>()->default_value("1e-12"))
+	        ("vis", "Boolean", cxxopts::value<bool>()->default_value("false"))
+	        ("serial", "Switch to serial algorithm (for comparison)", cxxopts::value<bool>()->default_value("false"))
+	        ("log-period", "Log every `log_period` timesteps", cxxopts::value<std::size_t>()->default_value("1"))
+	    ;
+	    auto args = options.parse(argc, argv);
 
-		std::cout << "Rank " << world.rank() << "/" << world.size() << " running\n";*/
+	    for (auto&& arg : { "in", "out", "nseg", "coarse-steps", "fine-steps" }) {
+		    if (!args.count(arg)) {
+		    	std::cerr << argv[0] << ": missing required argument: " << arg << std::endl;
+		    	return 1;
+		    }
+	    }
 
-		/*state::Config cfg(1, {1, 1, 1});
-		std::vector x = {
-			types::vec3({0.97000436, -0.24308753, 0}),
-			types::vec3({0, 0, 0}), 
-			types::vec3({-0.97000436, 0.24308753, 0})
-		};
-		std::vector v = {
-			types::vec3({0.466203685, 0.43236573, 0}),
-			types::vec3({-0.93240737,-0.86473146, 0}), 
-			types::vec3({0.466203685, 0.43236573, 0})
-		};
-		state::State initial(cfg, std::move(x), std::move(v));*/
+		auto [cfg, pos, vel] = parareal::io::load(args["in"].as<std::string>());
+		parareal::state::State initial(&cfg, pos, vel);
 
-		auto [cfg, pos, vel] = io::load("../planets.cfg");
-		state::State initial(&cfg, pos, vel);
+		std::vector<parareal::state::State> res;
 
-		#ifdef USE_PARAREAL
-			auto res = integration::parareal(
-				0,             // start time
-				365*100,       // end time
-				initial,       // initial state
-				4,             // number of segments (must be divisible by the number of ranks)
-				1000,          // maximum of parareal iters, 
-				1e-12,         // eps for convergence
-				integration::FixedStepSolver<integration::VerletStep>(10),
-				integration::FixedStepSolver<integration::RK4Step>(10000)
+		auto nseg = args["nseg"].as<std::size_t>();
+		auto time = args["time"].as<double>();
+		auto csteps = args["coarse-steps"].as<std::size_t>();
+		auto fsteps = args["fine-steps"].as<std::size_t>();
+		auto log_period = args["log-period"].as<std::size_t>();
+
+		if (args["serial"].as<bool>()) {
+			auto steps = nseg*fsteps;
+
+			auto solver = parareal::integration::solver_with_log_period<parareal::integration::RK4Step>(steps, log_period);
+			res = solver.integrate_verbose(0, time, initial);
+		} else {
+			res = parareal::integration::parareal(
+				0,                                   // start time
+				time,                                // end time
+				initial,                             // initial state
+				nseg,                                // number of segments (must be divisible by the number of ranks)
+				args["max-iters"].as<std::size_t>(), // maximum of parareal iters, 
+				args["eps"].as<double>(),            // eps for convergence
+				parareal::integration::FixedStepSolver<parareal::integration::VerletStep>(csteps),
+				parareal::integration::solver_with_log_period<parareal::integration::RK4Step>(fsteps, log_period)
 			);
-		#else
-			auto solver = integration::FixedStepSolver<integration::RK4Step>(40000);
-			auto res = solver.integrate_verbose(0, 365*100, initial);
-		#endif
+		}
 
-		//if (world.rank() == 0) {
-		io::show(res);
+		std::string outfile = args["out"].as<std::string>();
+		parareal::io::show(outfile, res);
 
-		#ifdef VIS
-		system("python3 vis.py out.txt");
-		#endif
-		//}
+		if (args["vis"].as<bool>()) {
+			std::stringstream ss;
+			ss << "python3 vis.py " << outfile;
+			system(ss.str().c_str());
+		}
 
 		return 0;
 	} catch (const std::exception& e) {
