@@ -1,0 +1,130 @@
+\documentclass[conference]{IEEEtran}
+%\IEEEoverridecommandlockouts
+% The preceding line is only needed to identify funding in the first footnote. If that is unneeded, please comment it out.
+%Template version as of 6/27/2024
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb,amsfonts}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage[thinc]{esdiff}
+
+\begin{document}
+
+\title{Parallel-in-time methods for Particle Simulations}
+
+\author{\IEEEauthorblockN{Lukáš Veškrna}
+\IEEEauthorblockA{\textit{Technical University Munich} \\
+Munich, Germany \\
+lukas.veskrna@gmail.com}
+}
+
+\maketitle
+
+\begin{abstract}
+TBD
+\end{abstract}
+
+\begin{IEEEkeywords}
+parareal, particle-simulations, parallel-in-time.
+\end{IEEEkeywords}
+
+\section{Introduction}
+
+Particle simulations are an important tool for understanding many different kinds of particle-based systems, such as molecular, fluid, plasma, solar system and stellar dynamics.
+
+Simulating those systems usually requires huge computations, which can take a very long time. Some of these computations can be run in parallel in order to reduce the computation time. There has been more focus in parallelizing these simulations through the spatial domain, which allows us to run bigger simulations in the same time.
+
+There do, however, exist algorithms that allow us to parallelize simulations in the time domain. This could be very useful for running smaller simulations through a very long timespan. This is of interest for example in solar system dynamics. If we want to learn more about the behavior of mostly stable planetary orbits, we have to simulate a long time. Thus, parallel-in-time algorithms can be employed.\cite{parallelsolar}
+
+In particle simulations, we are often numerically solving an ODE in the form:
+$$
+\diff{u(t)}{t} = f(t, u(t))
+$$
+where $f$ is the function describing our problem, $u(t)$ is the state of the system at time $t$ and we are given an initial condition $u(t_0) = u_0$.
+
+The integration part is the part which usually is dependent on some previous time step and thus can't be easily parallelized. In order to solve this problem, multiple techniques were devised with the most widely known one being the parareal algorithm.
+
+\section{The parareal algorithm}
+
+A description of the parareal algorithm is given in \cite{parareal}. It achieves parallel-in-time integration using two types of integrators. A coarse solver $\mathcal{C}$ is used first to roughly estimate the solution, while a fine (but potentially expensive) solver $\mathcal{F}$ is then used to fill in the gaps in this estimated trajectory.
+
+Supposing we integrate from time $t_0$ to $T$, we split this interval into $N$ segments of size $\Delta T = \frac{T-t_0}{N}$. We denote $u_0, u_1\dots u_N$ the states of the system in times $t_0, t_1\dots t_N$ with $t_n = t_0 + n\Delta T$ (so $t_0 = t_0$ and $t_N = T$).
+
+The algorithm works in iterations. The 0th iteration is used to initialize the algorithm, while the subsequent iterations improve the result of the previous iteration.
+
+In the 0th iteration, we use the coarse solver to compute $u_1\dots u_n$ sequentially. For every $0 \leq n < N$ we do
+$$
+u^0_{n+1} = \mathcal{C}(t_n, t_n+\Delta T, u^0_n)
+$$
+with $u^0_0 = u_0$, which is the initial state of the system.
+
+In every subsequent iteration $i+1$, we first calculate the results of the fine but expensive solver, $\mathcal{F}(t_n, t_n+\Delta T, u^{i}_n)$, for every $0 \leq n < N$ in parallel.
+
+Then, we adjust the estimated states from the previous iteration with the following correction:
+\begin{multline}
+u^{i+1}_{n+1} = \mathcal{C}(t_n, t_n+\Delta T, u^{i+1}_n)\\ + \mathcal{F}(t_n, t_n+\Delta T, u^i_n)\\ - \mathcal{C}(t_n, t_n+\Delta T, u^{i}_n)
+\end{multline}
+
+This is repeated until satisfactory convergence. It has been proven for example by \cite{parareal} (See Proposition 1) that for $i \to \infty$, we will converge to $u_{0\dots N}$ such that $u_{n+1} = \mathcal{F}(t_n, t_n+\Delta T, u_n)$, which is equivalent to computing the states at times $t_{0\dots N}$ with the fine solver sequentially.
+
+This method has been formulated using different generalized frameworks in \cite{parareal2}. They also extend the time interval paritioning to arbitrary partions, not only equally sized ones as in \cite{parareal}.
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\linewidth]{fig_1.eps}}
+\caption{Parareal convergence for the example of a harmonic oscillator. The coarse solver is Euler and the fine solver is RK4}
+\label{fig}
+\end{figure}
+
+\section{Application to particle simulations}
+The purpose of this paper is to examine the potential in the use of the parareal method for long running simulations such as simulations of the solar system. 
+
+\subsection{The particle simulation}
+We use a simple $n$-body particle simulation of the solar system with time complexity $\mathcal{O}(n^2)$, which we then integrate using the parareal method. Thus, we are integrating the following function:
+$$
+f(t, \mathbf{u}(t)) = f(t, (\mathbf{x}(t), \mathbf{v}(t))) = (\mathbf{v}(t), \mathbf{a}(t))
+$$
+where 
+$$
+a_i(t) = -G \sum_j m_j\frac{x_i(t)-x_j(t)}{\|x_i(t)-x_j(t)\|_2^3}
+$$
+where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely from the Newton's law of universal gravitation.
+
+\subsection{Choice of the coarse and fine integrators}
+\begin{itemize}
+    \item We use the Velocity Verlet method as the coarse integrator for its favourable stability properties and the classic fourth-order Runge-Kutta method (RK4) as the fine integrator for its better precision. 
+    \item Two symplectic methods could be used, however, due to the nature of the parareal algorithm, the resulting parareal integration would not necessarily be symplectic. A modified parareal algorithm that preserves the symplectic property, shown in \cite{symplecticparareal}, also exists, however it is beyond the scope of this paper.
+    \item An adaptive step size fine integrator with error control would be an option, such as the Dormand-Prince RK45 method. However, since the method can have very different execution times (depending on the step size required to reach desired accuracy), which could potentially be an issue when paralellizing the code, RK4 was used for simplicity.
+\end{itemize}
+
+\section{Implementation}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\linewidth]{fig_2.eps}}
+\caption{Path of Mercury over the time of one Earth year in the simulation converging over multiple iterations of the parareal algorithm. Velocity verlet and RK4 are used with the same step size of $0.5\text{day}$.}
+\label{fig}
+\end{figure}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\linewidth]{fig_3.eps}}
+\caption{\color{red} TODO}
+\label{fig}
+\end{figure}
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\linewidth]{fig_4.eps}}
+\caption{\color{red} TODO}
+\label{fig}
+\end{figure}
+
+\begin{thebibliography}{00}
+\bibitem{parareal}Bal, G. \& Maday, Y. A “Parareal” Time Discretization for Non-Linear PDE's with Application to the Pricing of an American Put. {\em Recent Developments In Domain Decomposition Methods}. pp. 189-202 (2002)
+6-578 (2007), [Online]. Available: https://doi.org/10.1007/978-3-642-56118-4\_12
+\bibitem{symplecticparareal}Bal, G. \& Wu, Q. Symplectic Parareal. {\em Domain Decomposition Methods In Science And Engineering XVII}. pp. 401-408 (2008)
+\bibitem{parallelsolar}Saha, P., Stadel, J. \& Tremaine, S. A Parallel Integration Method for Solar System Dynamics. {\em The Astronomical Journal}. \textbf{114} pp. 409 (1997,7), http://dx.doi.org/10.1086/118485
+\bibitem{parareal2}Gander, M. \& Vandewalle, S. ``Analysis of the Parareal Time‐Parallel Time‐Integration Method.'' SIAM Journal On Scientific Computing. 29, 556-578 (2007), [Online]. Available: https://doi.org/10.1137/05064607X
+\end{thebibliography}
+
+\end{document}
