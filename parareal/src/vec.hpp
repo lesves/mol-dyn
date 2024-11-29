@@ -7,7 +7,7 @@
 #include <cmath>
 
 
-namespace vec {
+namespace parareal { namespace vec {
 	using Dimension = std::size_t;
 
 	template<typename T, Dimension D>
@@ -196,6 +196,6 @@ namespace vec {
 			one[d] /= two;
 		}
 	}
-}
+} }
 
 #endif

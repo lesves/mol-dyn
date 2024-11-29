@@ -25,7 +25,7 @@ cd $SCRATCHDIR
 chmod 750 parareal
 
 # run program
-./parareal || { echo >&2 "Calculation ended up erroneously (with a code $?) !!"; exit 3; }
+./parareal -i $DATADIR/planets.cfg -o out.txt --nseg $OMP_NUM_THREADS --coarse-steps 100 --fine-steps 100000 --time 365000 --log-period 100 || { echo >&2 "Calculation ended up erroneously (with a code $?) !!"; exit 3; }
 
 # move the output to user's DATADIR or exit in case of failure
 cp out.txt $DATADIR/ || { echo >&2 "Result file(s) copying failed (with a code $?) !!"; exit 4; }

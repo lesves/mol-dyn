@@ -3,9 +3,9 @@
 
 #include "vec.hpp"
 
-namespace types {
+namespace parareal { namespace types {
 	using vec2 = vec::Vector<double, 2>;
 	using vec3 = vec::Vector<double, 3>;
-}
+} }
 
 #endif
