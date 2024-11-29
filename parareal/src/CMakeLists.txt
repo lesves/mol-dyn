@@ -12,10 +12,19 @@ add_compile_options(-Xpreprocessor -fopenmp -lomp)
 endif()
 
 find_package(OpenMP REQUIRED)
-target_link_libraries(parareal PUBLIC OpenMP::OpenMP_CXX)
+target_link_libraries(${TARGET_NAME} PUBLIC OpenMP::OpenMP_CXX)
 
-find_package(cxxopts REQUIRED)
-target_link_libraries(parareal PUBLIC cxxopts::cxxopts)
+include(FetchContent)
+#set(FETCHCONTENT_QUIET FALSE)
+
+FetchContent_Declare(
+    cxxopts
+    GIT_REPOSITORY "https://github.com/jarro2783/cxxopts.git"
+    GIT_TAG "master"
+    GIT_PROGRESS TRUE
+)
+FetchContent_MakeAvailable(cxxopts)
+target_link_libraries( ${TARGET_NAME} PUBLIC cxxopts )
 
 configure_file(../vis.py vis.py COPYONLY)
 execute_process(COMMAND sh -c "echo \"*\" > .gitignore")
