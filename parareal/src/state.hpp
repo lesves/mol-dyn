@@ -7,25 +7,39 @@
 
 #include "types.hpp"
 
-#define G 1
 #define SMOOTHING_EPS 0
 
 
 namespace state {
-	struct State {
+	class Config {
+	public:
+		double G = 1;
+		std::vector<double> m;
+
+		Config(double G, const std::vector<double>& m): G(G), m(m) {};
+		Config(double G, const std::vector<double>&& m): G(G), m(std::move(m)) {};
+	};
+
+	class State {
+	private:
+		const Config* cfg;
+
+	public:
 		std::vector<types::vec3> x;
 		std::vector<types::vec3> v;
 		std::vector<types::vec3> a;
-		std::vector<double> m;
 
-		State() {}
+		State(
+			const Config* cfg_,
+			const std::vector<types::vec3>& x_,
+			const std::vector<types::vec3>& v_
+		): cfg(cfg_), x(x_), v(v_), a(x.size()) {}
 
-		void add_particle(types::vec3 pos, types::vec3 vel, double mass) {
-			x.push_back(pos);
-			v.push_back(vel);
-			m.push_back(mass);
-			a.push_back(types::vec3());
-		}
+		State(
+			const Config* cfg_,
+			std::vector<types::vec3>&& x_,
+			std::vector<types::vec3>&& v_
+		): cfg(cfg_), x(std::move(x_)), v(std::move(v_)), a(x.size()) {}
 
 		std::size_t size() const {
 			return x.size();
@@ -44,8 +58,7 @@ namespace state {
 
 				auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
 
-				a[i] += -G * m[j] * diff / std::pow(smoothed, 3.);
-				//pot[i] = -G * m[i] * m[j] / smoothed / (double)2;
+				a[i] += -cfg->G * cfg->m[j] * diff / std::pow(smoothed, 3.);
 			}
 		}
 
@@ -63,7 +76,7 @@ namespace state {
 
 					auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
 
-					energy += -G * m[i] * m[j] / smoothed / 2.;
+					energy += -cfg->G * cfg->m[i] * cfg->m[j] / smoothed / 2.;
 				}
 			}
 
@@ -74,7 +87,7 @@ namespace state {
 			double energy;
 
 			for (std::size_t i = 0; i < size(); ++i) {
-				energy += 0.5 * m[i]*v[i].norm_squared();
+				energy += 0.5 * cfg->m[i]*v[i].norm_squared();
 			}
 
 			return energy;
@@ -92,24 +105,22 @@ namespace state {
 		}
 
 		// dump to arrays for MPI
-		void serialize(double* state_xs, double* state_vs, double* state_ms) const {
+		void serialize(double* state_xs, double* state_vs) const {
 			for (std::size_t i = 0; i < size(); ++i) {
 				for (std::size_t d = 0; d < 3; ++d) {
 					state_xs[d+i*size()] = x[i][d];
 					state_vs[d+i*size()] = v[i][d];
 				}
-				state_ms[i] = m[i];
 			}
 		}
 
 		// replaces the particles inside with given particles, must be the same size!
-		void deserialize(double* state_xs, double* state_vs, double* state_ms) {
+		void deserialize(const double* state_xs, const double* state_vs) {
 			for (std::size_t i = 0; i < size(); ++i) {
 				for (std::size_t d = 0; d < 3; ++d) {
 					x[i][d] = state_xs[d+i*size()];
 					v[i][d] = state_vs[d+i*size()];
 				}
-				m[i] = state_ms[i];
 			}
 		}
 	};

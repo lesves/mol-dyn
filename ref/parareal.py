@@ -1,12 +1,26 @@
 import numpy as np
 import matplotlib.pyplot as plt
-#from loky import get_reusable_executor
+from functools import wraps
+from loky import get_reusable_executor
 
 
+def basic_solver(sol):
+	@wraps(sol)
+	def wrapper(f, t0, t1, u0, return_last=True, **kwargs):
+		u1 = sol(f, t0, t1, u0, **kwargs)
+		if return_last:
+			return u1
+		else:
+			return (np.array([t0, t1]), np.array([u0, u1]))
+	return wrapper
+
+
+@basic_solver
 def euler(f, t0, t1, u):
 	return u + (t1-t0)*f(t1, u)
 
 
+@basic_solver
 def verlet(f, t0, t1, u):
 	dt = t1-t0
 
@@ -18,6 +32,7 @@ def verlet(f, t0, t1, u):
 	return np.array([x, v])
 
 
+@basic_solver
 def rk4(f, t0, t1, u):
 	dt = t1-t0
 
@@ -45,17 +60,35 @@ def serial_integrate(f, t0, T, u0, solver, num_steps):
 	return np.array(ts), np.array(us)
 
 
-def solver_num_steps(solver, num_steps, f, t0, t1, u):
-	return serial_integrate(f, t0, t1, u, solver, num_steps)[1][-1]
+def solver_num_steps(solver, num_steps, f, t0, t1, u, return_last=True):
+	ts, xs = serial_integrate(f, t0, t1, u, solver, num_steps)
+	if return_last:
+		return xs[-1]
+	return ts, xs
 
 
-def parareal(f, t0, T, u0, num_segments, max_iters, eps, coarse_solver, fine_solver, observer=None):
+def parallel_map(f, data, executor=get_reusable_executor()):
+	return executor.map(f, data)
+
+
+def parareal_parallel_fine(fine_solver, f, ts, segment_size, us, **kwargs):
+	def fine_u(i):
+		return fine_solver(f, ts[i], ts[i]+segment_size, us[i], **kwargs)
+
+	return parallel_map(fine_u, range(len(us)-1))
+
+
+def parareal(f, t0, T, u0, num_segments, max_iters, eps, coarse_solver, fine_solver, coarse_f=None, observer=None):
 	segment_size = (T-t0)/num_segments
+	print(f"{segment_size=}")
 
 	#executor = get_reusable_executor()
 
+	if coarse_f is None:
+		coarse_f = f
+
 	# 0th iteration
-	ts, us = serial_integrate(f, t0, T, u0, coarse_solver, num_segments)
+	ts, us = serial_integrate(coarse_f, t0, T, u0, coarse_solver, num_segments)
 
 	for it in range(1, max_iters+1):
 		if observer is not None:
@@ -63,15 +96,12 @@ def parareal(f, t0, T, u0, num_segments, max_iters, eps, coarse_solver, fine_sol
 
 		us_ = [u0]
 
-		#def fine_u(i):
-		#	return fine_solver(f, ts[i], ts[i]+segment_size, us[i])
-
-		#fine_us = list(executor.map(fine_u, range(len(us)-1)))
+		fine_us = list(parareal_parallel_fine(fine_solver, f, ts, segment_size, us))
 
 		for i in range(len(us)-1):
 			t = ts[i]
 
-			u_ = coarse_solver(f, t, t+segment_size, us_[i]) + fine_solver(f, t, t+segment_size, us[i]) - coarse_solver(f, t, t+segment_size, us[i])
+			u_ = coarse_solver(coarse_f, t, t+segment_size, us_[i]) + fine_us[i] - coarse_solver(coarse_f, t, t+segment_size, us[i])
 			us_.append(u_)
 		us_ = np.array(us_)
 
@@ -83,7 +113,8 @@ def parareal(f, t0, T, u0, num_segments, max_iters, eps, coarse_solver, fine_sol
 
 		us = us_
 
-	return ts, us
+	res = list(parareal_parallel_fine(fine_solver, f, ts, segment_size, us, return_last=False))
+	return np.concatenate([ts for ts, us in res]), np.concatenate([us for ts, us in res])
 
 
 def test_problem(show=True):
