@@ -7,6 +7,7 @@
 \usepackage{amsmath,amssymb,amsfonts}
 \usepackage{algorithmic}
 \usepackage{graphicx}
+\usepackage{booktabs}
 \usepackage{textcomp}
 \usepackage{xcolor}
 \usepackage[thinc]{esdiff}
@@ -75,7 +76,7 @@ This method has been formulated using different generalized frameworks in \cite{
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_1.eps}}
 \caption{Parareal convergence for the example of a harmonic oscillator. The coarse solver is Euler and the fine solver is RK4}
-\label{fig}
+\label{oscillator}
 \end{figure}
 
 \section{Application to particle simulations}
@@ -104,20 +105,37 @@ where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely f
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_2.eps}}
 \caption{Path of Mercury over the time of one Earth year in the simulation converging over multiple iterations of the parareal algorithm. Velocity verlet and RK4 are used with the same step size of $0.5\text{day}$.}
-\label{fig}
+\label{mercury}
 \end{figure}
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_3.eps}}
 \caption{\color{red} TODO}
-\label{fig}
+\label{longrunning}
 \end{figure}
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_4.eps}}
 \caption{\color{red} TODO}
-\label{fig}
+\label{energy}
 \end{figure}
+
+\begin{table*}[htbp]
+\caption{Comparison of running times taken by different configurations of the simulator}
+\begin{center}
+\begin{tabular}{ccrrrrrrcc}
+\toprule
+\textbf{Program} & \textbf{Environment} & \textbf{n CPUs} & \textbf{Segments} & \textbf{Fine steps} & \textbf{Coarse steps} & \textbf{Final steps} & \textbf{CPU time} & \textbf{Runtime} \\
+\midrule
+parareal & MetaCentrum & 30 & 30 & $10^5$ & 100 & $30\cdot 10^5$ & 02:01:57 & 00:04:30 \\
+serial   & MetaCentrum &  1 &  1 & N/A    & N/A & $30\cdot 10^5$ & 00:06:27 & 00:06:27 \\
+parareal & Laptop      &  4 &  4 & $10^5$ & 100 & $4\cdot 10^5$ & 00:03:26 & 00:00:51 \\
+serial   & Laptop      &  1 &  1 & N/A    & N/A & $4\cdot 10^5$ & 00:00:30 & 00:00:30 \\
+\bottomrule
+\end{tabular}
+\label{runtimes}
+\end{center}
+\end{table*}
 
 \begin{thebibliography}{00}
 \bibitem{parareal}Bal, G. \& Maday, Y. A “Parareal” Time Discretization for Non-Linear PDE's with Application to the Pricing of an American Put. {\em Recent Developments In Domain Decomposition Methods}. pp. 189-202 (2002)

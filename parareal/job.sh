@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N parareal_test
-#PBS -l select=1:ncpus=30:ompthreads=30:mem=1gb:scratch_local=1gb
-#PBS -l walltime=00:05:00
+#PBS -l select=1:ncpus=32:ompthreads=32:mem=1gb
+#PBS -l walltime=00:10:00
 
 export OMP_NUM_THREADS=$PBS_NUM_PPN
 
@@ -10,25 +10,24 @@ DATADIR=/storage/praha1/home/skywalker/mol-dyn/parareal
 
 # append a line to a file "jobs_info.txt" containing the ID of the job, the hostname of the node it is run on, and the path to a scratch directory
 # this information helps to find a scratch directory in case the job fails, and you need to remove the scratch directory manually 
-echo "$PBS_JOBID is running on node `hostname -f` in a scratch directory $SCRATCHDIR" >> $DATADIR/jobs_info.txt
-
-# (old) load openmpi modules
-# module add openmpi
-
-# test if the scratch directory is set
-# if scratch directory is not set, issue error message and exit
-test -n "$SCRATCHDIR" || { echo >&2 "Variable SCRATCHDIR is not set!"; exit 1; }
-
-# copy program
-cp $DATADIR/build/parareal $SCRATCHDIR || { echo >&2 "Error while copying input file(s)!"; exit 2; }
-cd $SCRATCHDIR
-chmod 750 parareal
+echo "$PBS_JOBID is running on node `hostname -f`" >> $DATADIR/jobs_info.txt
 
 # run program
-./parareal -i $DATADIR/planets.cfg -o out.txt --nseg $OMP_NUM_THREADS --coarse-steps 100 --fine-steps 100000 --time 365000 --log-period 100 || { echo >&2 "Calculation ended up erroneously (with a code $?) !!"; exit 3; }
+NSEG=32
+COARSE_STEPS=5000
+FINE_STEPS=50000
+TIME=10000
+EPS=1e-3
+MAX_ITERS=16
+LOG_PERIOD=10
 
-# move the output to user's DATADIR or exit in case of failure
-cp out.txt $DATADIR/ || { echo >&2 "Result file(s) copying failed (with a code $?) !!"; exit 4; }
+echo "=== parareal ==="
+time $DATADIR/build/parareal -i $DATADIR/planets.cfg -o $DATADIR/out_p.txt --nseg $NSEG --coarse-steps $COARSE_STEPS --fine-steps $FINE_STEPS --time $TIME --max-iters $MAX_ITERS --eps $EPS --log-period $LOG_PERIOD
+
+#echo "===  serial  ==="
+#time ./parareal --serial -i $DATADIR/giants.cfg -o out.txt --nseg $NSEG --coarse-steps $COARSE_STEPS --fine-steps $FINE_STEPS --time $TIME --max-iters $MAX_ITERS --eps $EPS
+#echo "=== distance ==="
+#python3 $DATADIR/dist.py out_p.txt out.txt
 
 # clean the SCRATCH directory
-clean_scratch
+# clean_scratch

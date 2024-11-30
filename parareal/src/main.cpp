@@ -23,7 +23,7 @@ int main(int argc, char** argv) {
 	        ("coarse-steps", "Number of steps of the coarse integrator", cxxopts::value<std::size_t>())
 	        ("fine-steps", "Number of steps of the coarse integrator", cxxopts::value<std::size_t>())
 	        ("max-iters", "Maximum number of parareal iterations", cxxopts::value<std::size_t>()->default_value("1000"))
-	        ("eps", "Epsilon for parareal convergence", cxxopts::value<double>()->default_value("1e-12"))
+	        ("eps", "Epsilon for parareal convergence", cxxopts::value<double>()->default_value("1e-5"))
 	        ("vis", "Boolean", cxxopts::value<bool>()->default_value("false"))
 	        ("serial", "Switch to serial algorithm (for comparison)", cxxopts::value<bool>()->default_value("false"))
 	        ("log-period", "Log every `log_period` timesteps", cxxopts::value<std::size_t>()->default_value("1"))
