@@ -32,6 +32,14 @@ TBD
 parareal, particle-simulations, parallel-in-time.
 \end{IEEEkeywords}
 
+\section*{Acknowledgment}
+\addcontentsline{toc}{section}{Acknowledgment}
+
+I am greatful to my advisor, Samuel J. Newcome, M. Sc., for suggesting directions and providing valueable feedback.
+
+Computational resources were provided by the e-INFRA CZ project (ID:90254),
+supported by the Ministry of Education, Youth and Sports of the Czech Republic.
+
 \section{Introduction}
 
 Particle simulations are an important tool for understanding many different kinds of particle-based systems, such as molecular, fluid, plasma, solar system and stellar dynamics.
@@ -97,7 +105,7 @@ where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely f
 \begin{itemize}
     \item We use the Velocity Verlet method as the coarse integrator for its favourable stability properties and the classic fourth-order Runge-Kutta method (RK4) as the fine integrator for its better precision. 
     \item Two symplectic methods could be used, however, due to the nature of the parareal algorithm, the resulting parareal integration would not necessarily be symplectic. A modified parareal algorithm that preserves the symplectic property, shown in \cite{symplecticparareal}, also exists, however it is beyond the scope of this paper.
-    \item An adaptive step size fine integrator with error control would be an option, such as the Dormand-Prince RK45 method. However, since the method can have very different execution times (depending on the step size required to reach desired accuracy), which could potentially be an issue when paralellizing the code, RK4 was used for simplicity.
+    \item An adaptive step size fine integrator with error control would be an option, such as the Dormand-Prince RK45 method. However, since the method can have very different execution times (depending on the step size required to reach desired accuracy), which could potentially be an issue when paralellizing the code, RK4 was used for simplicity. {\color{red} TODO: source}
 \end{itemize}
 
 \section{Implementation}
@@ -123,15 +131,18 @@ where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely f
 \begin{table*}[htbp]
 \caption{Comparison of running times taken by different configurations of the simulator}
 \begin{center}
-\begin{tabular}{ccrrrrrrcc}
+\begin{tabular}{ccrrrrrrrrcc}
 \toprule
-\textbf{Program} & \textbf{Environment} & \textbf{n CPUs} & \textbf{Segments} & \textbf{Fine steps} & \textbf{Coarse steps} & \textbf{Final steps} & \textbf{CPU time} & \textbf{Runtime} \\
+Program & Time &  n CPUs & Segments & $N_\text{Coarse}$ & $N_{\text{Fine}}$ & $N_{\text{Final}}$ $^{\mathrm{a}}$ & Iters $^{\mathrm{b}}$ & Abs. error $^{\mathrm{c}}$ & Rel. error $^{\mathrm{d}}$ & CPU time & Runtime \\
 \midrule
-parareal & MetaCentrum & 30 & 30 & $10^5$ & 100 & $30\cdot 10^5$ & 02:01:57 & 00:04:30 \\
-serial   & MetaCentrum &  1 &  1 & N/A    & N/A & $30\cdot 10^5$ & 00:06:27 & 00:06:27 \\
-parareal & Laptop      &  4 &  4 & $10^5$ & 100 & $4\cdot 10^5$ & 00:03:26 & 00:00:51 \\
-serial   & Laptop      &  1 &  1 & N/A    & N/A & $4\cdot 10^5$ & 00:00:30 & 00:00:30 \\
+parareal & $10^4\text{days}$ & 32 & 32 &  5000 &  50000 & 1600000 & 1 & 0.0030 AU & 1.00\% & 00:05:33 & 00:00:35 \\
+parareal & $10^4\text{days}$ & 16 & 16 & 10000 & 100000 & 1600000 & 2 & 0.0031 AU & 1.03\% & 00:08:12 & 00:01:07 \\
+serial & $10^4\text{days}$ & 1 & 1 & N/A & 1600000 & 1600000 & N/A & 0 AU & 0\% & 00:02:34 & 00:02:34 \\
 \bottomrule
+\multicolumn{11}{l}{$^{\mathrm{a}}$ Resulting number of steps (equal to number of segments times $N_\text{Fine}$)} \\
+\multicolumn{11}{l}{$^{\mathrm{b}}$ Number of iterations required for convergence ($\varepsilon = 10^{-3}$)} \\
+\multicolumn{11}{l}{$^{\mathrm{c}}$ Maximum difference from the corresponding serial computation across the trajectory} \\
+\multicolumn{11}{l}{$^{\mathrm{d}}$ Maximum relative error across the trajectory compared to the serial computation}
 \end{tabular}
 \label{runtimes}
 \end{center}
