@@ -11,7 +11,7 @@ import ref.planets as planets
 
 
 def fig_4():
-	data = np.loadtxt("parareal_test_out.txt.7069723")
+	data = np.loadtxt("results/32.out.txt")
 	data, energy = data[:, :-2], data[:, -2:]
 
 	ax = plt.axes()

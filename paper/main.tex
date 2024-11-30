@@ -54,7 +54,7 @@ $$
 $$
 where $f$ is the function describing our problem, $u(t)$ is the state of the system at time $t$ and we are given an initial condition $u(t_0) = u_0$.
 
-The integration part is the part which usually is dependent on some previous time step and thus can't be easily parallelized. In order to solve this problem, multiple techniques were devised with the most widely known one being the parareal algorithm.
+The integration part is the part which usually is dependent on some previous time step and thus can't be easily parallelized. In order to make it parallelizable, multiple techniques were devised, one of them being the parareal algorithm.
 
 \section{The parareal algorithm}
 
@@ -135,7 +135,7 @@ where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely f
 \toprule
 Program & Time &  n CPUs & Segments & $N_\text{Coarse}$ & $N_{\text{Fine}}$ & $N_{\text{Final}}$ $^{\mathrm{a}}$ & Iters $^{\mathrm{b}}$ & Abs. error $^{\mathrm{c}}$ & Rel. error $^{\mathrm{d}}$ & CPU time & Runtime \\
 \midrule
-parareal & $10^4\text{days}$ & 32 & 32 &  5000 &  50000 & 1600000 & 1 & 0.0030 AU & 1.00\% & 00:05:33 & 00:00:35 \\
+parareal & $10^4\text{days}$ & 32 & 32 &  5000 &  50000 & 1600000 & 1 & 0.0030 AU & 0.97\% & 00:05:33 & 00:00:35 \\
 parareal & $10^4\text{days}$ & 16 & 16 & 10000 & 100000 & 1600000 & 2 & 0.0031 AU & 1.03\% & 00:08:12 & 00:01:07 \\
 serial & $10^4\text{days}$ & 1 & 1 & N/A & 1600000 & 1600000 & N/A & 0 AU & 0\% & 00:02:34 & 00:02:34 \\
 \bottomrule
