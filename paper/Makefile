@@ -10,7 +10,7 @@ main.pdf: main.tex fig_1.eps fig_2.eps fig_3.eps fig_4.eps
 	xelatex main.tex
 	xelatex main.tex
 
-fig_1.eps: fig_1.py
+fig_1.eps: fig_1.py ../ref/parareal.py
 	python3 fig_1.py
 
 fig_2.eps: fig_2.py

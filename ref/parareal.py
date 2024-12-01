@@ -140,6 +140,9 @@ def test_problem(show=True):
 
 	plt.plot(ts, np.sin(ts), label=f"true function")
 
+	plt.xlabel("t [s]")
+	plt.ylabel("x [m]")
+
 	plt.legend()
 	if show:
 		plt.show()

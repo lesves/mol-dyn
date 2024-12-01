@@ -83,7 +83,7 @@ This method has been formulated using different generalized frameworks in \cite{
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_1.eps}}
-\caption{Parareal convergence for the example of a harmonic oscillator. The coarse solver is Euler and the fine solver is RK4}
+\caption{Parareal convergence for the example of a harmonic oscillator with $k = 1\frac{\text{N}}{\text{m}}$. The coarse solver is Euler and the fine solver is RK4.}
 \label{oscillator}
 \end{figure}
 
@@ -103,28 +103,28 @@ where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely f
 
 \subsection{Choice of the coarse and fine integrators}
 \begin{itemize}
-    \item We use the Velocity Verlet method as the coarse integrator for its favourable stability properties and the classic fourth-order Runge-Kutta method (RK4) as the fine integrator for its better precision. 
+    \item We use the Velocity Verlet method as the coarse integrator for its favourable stability properties {\color{red} TODO: source} and the classic fourth-order Runge-Kutta method (RK4) as the fine integrator for its precision {\color{red} TODO: source}. 
     \item Two symplectic methods could be used, however, due to the nature of the parareal algorithm, the resulting parareal integration would not necessarily be symplectic. A modified parareal algorithm that preserves the symplectic property, shown in \cite{symplecticparareal}, also exists, however it is beyond the scope of this paper.
-    \item An adaptive step size fine integrator with error control would be an option, such as the Dormand-Prince RK45 method. However, since the method can have very different execution times (depending on the step size required to reach desired accuracy), which could potentially be an issue when paralellizing the code, RK4 was used for simplicity. {\color{red} TODO: source}
+    \item An adaptive step size fine integrator with error control would be an option, such as the Dormand-Prince RK45 method. However, since the method can have very different execution times (depending on the step size required to reach desired accuracy), which could potentially be an issue when paralellizing the code, RK4 was used for simplicity.
 \end{itemize}
 
 \section{Implementation}
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_2.eps}}
-\caption{Path of Mercury over the time of one Earth year in the simulation converging over multiple iterations of the parareal algorithm. Velocity verlet and RK4 are used with the same step size of $0.5\text{day}$.}
+\caption{Path of Mercury over the time of one Earth year in a parareal integrated simulation converging over multiple iterations of the parareal algorithm. Velocity verlet and RK4 are used with the same step size of $0.5\text{ day}$.}
 \label{mercury}
 \end{figure}
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_3.eps}}
-\caption{\color{red} TODO}
-\label{longrunning}
+\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal on 32 CPUs. For more information, see table \ref{runtimes}.}
+\label{sim}
 \end{figure}
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_4.eps}}
-\caption{\color{red} TODO}
+\caption{Conservation of energy. Same simulation as in Fig. \ref{sim}.}
 \label{energy}
 \end{figure}
 
