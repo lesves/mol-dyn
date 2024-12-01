@@ -11,7 +11,7 @@ import ref.planets as planets
 
 
 def fig_4():
-	data = np.loadtxt("results/32.out.txt")
+	data = np.loadtxt("results/m.32.out.txt")
 	data, energy = data[:, :-2], data[:, -2:]
 
 	ax = plt.axes()

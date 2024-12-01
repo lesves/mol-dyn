@@ -29,16 +29,8 @@ TBD
 \end{abstract}
 
 \begin{IEEEkeywords}
-parareal, particle-simulations, parallel-in-time.
+parareal, particle simulations, parallel-in-time, solar system.
 \end{IEEEkeywords}
-
-\section*{Acknowledgment}
-\addcontentsline{toc}{section}{Acknowledgment}
-
-I am greatful to my advisor, Samuel J. Newcome, M. Sc., for suggesting directions and providing valueable feedback.
-
-Computational resources were provided by the e-INFRA CZ project (ID:90254),
-supported by the Ministry of Education, Youth and Sports of the Czech Republic.
 
 \section{Introduction}
 
@@ -91,15 +83,19 @@ This method has been formulated using different generalized frameworks in \cite{
 The purpose of this paper is to examine the potential in the use of the parareal method for long running simulations such as simulations of the solar system. 
 
 \subsection{The particle simulation}
-We use a simple $n$-body particle simulation of the solar system with time complexity $\mathcal{O}(n^2)$, which we then integrate using the parareal method. Thus, we are integrating the following function:
+We use a simple $n$-body particle simulation of the solar system with time complexity $\mathcal{O}(n^2)$, which we then integrate using the parareal method. This is inefficient for a large number of particles, however, our focus is on the parallel-in-time integration, therefore we use a simpler simulation.
+
+Thus, we are integrating the following equation:
 $$
-f(t, \mathbf{u}(t)) = f(t, (\mathbf{x}(t), \mathbf{v}(t))) = (\mathbf{v}(t), \mathbf{a}(t))
+\diff{\mathbf{u}(t)}{t} = f(t, \mathbf{u}(t)) = f(t, (\mathbf{x}(t), \mathbf{v}(t))) = (\mathbf{v}(t), \mathbf{a}(t))
 $$
 where 
 $$
 a_i(t) = -G \sum_j m_j\frac{x_i(t)-x_j(t)}{\|x_i(t)-x_j(t)\|_2^3}
 $$
 where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely from the Newton's law of universal gravitation.
+
+It is also possible to use a similar algorithm to the parareal algorithm using a simplified model instead of the coarse solver. This was done prior to the invention of parareal by \cite{parallelsolar} also in a solar system simulation, who obtained the coarse approximation by simulating only the interactions of Sun and other planets.\cite{parallelsolar}\cite{farfuture}
 
 \subsection{Choice of the coarse and fine integrators}
 \begin{itemize}
@@ -108,7 +104,8 @@ where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely f
     \item An adaptive step size fine integrator with error control would be an option, such as the Dormand-Prince RK45 method. However, since the method can have very different execution times (depending on the step size required to reach desired accuracy), which could potentially be an issue when paralellizing the code, RK4 was used for simplicity.
 \end{itemize}
 
-\section{Implementation}
+\subsection{Stopping criteria}
+We assume the algorithm has converged when the maximum distance between the states of two consecutive iterations is smaller than some $\varepsilon$. We use $\varepsilon = 10^{-3}\text{ AU}$.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_2.eps}}
@@ -116,9 +113,16 @@ where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely f
 \label{mercury}
 \end{figure}
 
+\section{Implementation and experiments}
+Two implementations have been created, first a reference implementation in Python and then a faster one in C++ with OpenMP. 
+
+In case we would want to use a substantially higher number of CPUs, we would have to use a different framework, such as MPI. However, due to the higher complexity and difficulty of such an implementation, an easier approach using OpenMP was used in this project for the present time instead.
+
+Multiple experiments were ran on a cluster in order to get a more reproducible environment. The resulting run times were collected in Table \ref{runtimes}. For visualizations of the simulation results see Figures \ref{sim} and \ref{energy}.
+
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_3.eps}}
-\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal on 32 CPUs. For more information, see table \ref{runtimes}.}
+\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal on 32 CPUs. For more information, see Table \ref{runtimes}.}
 \label{sim}
 \end{figure}
 
@@ -129,30 +133,43 @@ where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely f
 \end{figure}
 
 \begin{table*}[htbp]
-\caption{Comparison of running times taken by different configurations of the simulator}
+\caption{Comparison of running times taken by different configurations of the simulator. 
+$N_{\text{Coarse}}$ and $N_{\text{Fine}}$ refer to the number of steps of the coarse and the fine integrators respectively. 
+To allow comparison with the classic sequential algorithm using only the fine integrator, $N_{\text{Final}}$ shows the resulting number of steps (for parareal it is equal to the number of segments times $N_\text{Fine}$).
+\newline The programs were run on the machines of the zia.cerit-sc.cz cluster owned by CERIT-SC/MU, a part of the MetaCentrum organization, each equiped with two AMD EPYC 7662 (2x 64 Core) 3.31 GHz processors.}
 \begin{center}
 \begin{tabular}{ccrrrrrrrrcc}
 \toprule
-Program & Time &  n CPUs & Segments & $N_\text{Coarse}$ & $N_{\text{Fine}}$ & $N_{\text{Final}}$ $^{\mathrm{a}}$ & Iters $^{\mathrm{b}}$ & Abs. error $^{\mathrm{c}}$ & Rel. error $^{\mathrm{d}}$ & CPU time & Runtime \\
+Program & Time &  n CPUs & Segments & $N_\text{Coarse}$ & $N_{\text{Fine}}$ & $N_{\text{Final}}$ & Iters $^{\mathrm{a}}$ & Abs. error $^{\mathrm{b}}$ & Rel. error $^{\mathrm{c}}$ & CPU time & Runtime \\
 \midrule
-parareal & $10^4\text{days}$ & 32 & 32 &  5000 &  50000 & 1600000 & 1 & 0.0030 AU & 0.97\% & 00:05:33 & 00:00:35 \\
-parareal & $10^4\text{days}$ & 16 & 16 & 10000 & 100000 & 1600000 & 2 & 0.0031 AU & 1.03\% & 00:08:12 & 00:01:07 \\
-serial & $10^4\text{days}$ & 1 & 1 & N/A & 1600000 & 1600000 & N/A & 0 AU & 0\% & 00:02:34 & 00:02:34 \\
+parareal & $10^4\text{days}$ & 32 & 32 &  $5\times10^3$ &  $5\times10^4$ & $16\times10^5$ & 1 & 0.0030 AU & 0.97\% & 00:05:33 & 00:00:35 \\
+parareal & $10^4\text{days}$ & 16 & 16 & $1\times10^4$ & $1\times10^5$ & $16\times10^5$ & 2 & 0.0031 AU & 1.03\% & 00:08:12 & 00:01:07 \\
+serial & $10^4\text{days}$ & 1 & 1 & N/A & $16\times10^5$ & $16\times10^5$ & N/A & 0 AU & 0\% & 00:02:34 & 00:02:34 \\
 \bottomrule
-\multicolumn{11}{l}{$^{\mathrm{a}}$ Resulting number of steps (equal to number of segments times $N_\text{Fine}$)} \\
-\multicolumn{11}{l}{$^{\mathrm{b}}$ Number of iterations required for convergence ($\varepsilon = 10^{-3}$)} \\
+\multicolumn{11}{l}{$^{\mathrm{b}}$ Number of iterations required for convergence ($\varepsilon = 10^{-3}\text{ AU}$)} \\
 \multicolumn{11}{l}{$^{\mathrm{c}}$ Maximum difference from the corresponding serial computation across the trajectory} \\
-\multicolumn{11}{l}{$^{\mathrm{d}}$ Maximum relative error across the trajectory compared to the serial computation}
+\multicolumn{11}{l}{$^{\mathrm{d}}$ Maximum relative error across the trajectory compared to the serial computation} \\
 \end{tabular}
 \label{runtimes}
 \end{center}
 \end{table*}
+
+\section{Summary and discussion}
+
+\section*{Acknowledgment}
+\addcontentsline{toc}{section}{Acknowledgment}
+
+I would like to thank my advisor, Samuel J. Newcome, M. Sc., for suggesting directions and providing valueable feedback.
+
+Computational resources were provided by the e-INFRA CZ project (ID:90254),
+supported by the Ministry of Education, Youth and Sports of the Czech Republic.
 
 \begin{thebibliography}{00}
 \bibitem{parareal}Bal, G. \& Maday, Y. A “Parareal” Time Discretization for Non-Linear PDE's with Application to the Pricing of an American Put. {\em Recent Developments In Domain Decomposition Methods}. pp. 189-202 (2002)
 6-578 (2007), [Online]. Available: https://doi.org/10.1007/978-3-642-56118-4\_12
 \bibitem{symplecticparareal}Bal, G. \& Wu, Q. Symplectic Parareal. {\em Domain Decomposition Methods In Science And Engineering XVII}. pp. 401-408 (2008)
 \bibitem{parallelsolar}Saha, P., Stadel, J. \& Tremaine, S. A Parallel Integration Method for Solar System Dynamics. {\em The Astronomical Journal}. \textbf{114} pp. 409 (1997,7), http://dx.doi.org/10.1086/118485
+\bibitem{farfuture}Gander, M. Is it possible to predict the far future before the near future is known accurately?. {\em Snapshots Of Modern Mathematics From Oberwolfach; 2019}. pp. 21 (2019), [Online]. Available: http://publications.mfo.de/handle/mfo/3693
 \bibitem{parareal2}Gander, M. \& Vandewalle, S. ``Analysis of the Parareal Time‐Parallel Time‐Integration Method.'' SIAM Journal On Scientific Computing. 29, 556-578 (2007), [Online]. Available: https://doi.org/10.1137/05064607X
 \end{thebibliography}
 
