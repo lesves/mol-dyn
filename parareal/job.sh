@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N parareal_test
-#PBS -l select=1:ncpus=32:ompthreads=32:mem=1gb
-#PBS -l walltime=00:10:00
+#PBS -l select=1:ncpus=32:ompthreads=32:mem=1gb:cluster=zenon
+#PBS -l walltime=01:30:00
 
 export OMP_NUM_THREADS=$PBS_NUM_PPN
 
@@ -13,15 +13,14 @@ DATADIR=/storage/praha1/home/skywalker/mol-dyn/parareal
 echo "$PBS_JOBID is running on node `hostname -f`" >> $DATADIR/jobs_info.txt
 
 # run program
-NSEG=32
-COARSE_STEPS=5000
-FINE_STEPS=50000
-TIME=10000
-EPS=1e-3
+NSEG=64
+COARSE_STEPS=100000
+FINE_STEPS=1000000
+TIME=100000
+EPS=1e-4
 MAX_ITERS=16
-LOG_PERIOD=10
+LOG_PERIOD=1000
 
-echo "=== parareal ==="
 time $DATADIR/build/parareal -i $DATADIR/planets.cfg -o $DATADIR/out_p.txt --nseg $NSEG --coarse-steps $COARSE_STEPS --fine-steps $FINE_STEPS --time $TIME --max-iters $MAX_ITERS --eps $EPS --log-period $LOG_PERIOD
 
 #echo "===  serial  ==="

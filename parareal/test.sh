@@ -3,12 +3,12 @@ cd build
 cmake --build .
 
 NSEG=32
-COARSE_STEPS=5000
-FINE_STEPS=50000
-TIME=10000
+COARSE_STEPS=200000
+FINE_STEPS=2000000
+TIME=100000
 EPS=1e-3
-MAX_ITERS=8
-LOG_PERIOD=10
+MAX_ITERS=16
+LOG_PERIOD=1000
 
 echo "=== parareal ==="
 time ./parareal -i ../planets.cfg -o out_p.txt --nseg $NSEG --coarse-steps $COARSE_STEPS --fine-steps $FINE_STEPS --time $TIME --max-iters $MAX_ITERS --eps $EPS --log-period $LOG_PERIOD
