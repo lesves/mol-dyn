@@ -10,6 +10,7 @@
 \usepackage{booktabs}
 \usepackage{textcomp}
 \usepackage{xcolor}
+\usepackage{comment}
 \usepackage[thinc]{esdiff}
 
 \begin{document}
@@ -69,7 +70,7 @@ Then, we adjust the estimated states from the previous iteration with the follow
 u^{i+1}_{n+1} = \mathcal{C}(t_n, t_n+\Delta T, u^{i+1}_n)\\ + \mathcal{F}(t_n, t_n+\Delta T, u^i_n)\\ - \mathcal{C}(t_n, t_n+\Delta T, u^{i}_n)
 \end{multline}
 
-This is repeated until satisfactory convergence. It has been proven for example by \cite{parareal} (See Proposition 1) that for $i \to \infty$, we will converge to $u_{0\dots N}$ such that $u_{n+1} = \mathcal{F}(t_n, t_n+\Delta T, u_n)$, which is equivalent to computing the states at times $t_{0\dots N}$ with the fine solver sequentially.
+This is repeated until satisfactory convergence. It has been proven for example by \cite{parareal} (See Proposition 1) {\color{red} TODO: better source} that for $i \to \infty$, we will converge to $u_{0\dots N}$ such that $u_{n+1} = \mathcal{F}(t_n, t_n+\Delta T, u_n)$, which is equivalent to computing the states at times $t_{0\dots N}$ with the fine solver sequentially.
 
 This method has been formulated using different generalized frameworks in \cite{parareal2}. They also extend the time interval paritioning to arbitrary partions, not only equally sized ones as in \cite{parareal}.
 
@@ -78,6 +79,33 @@ This method has been formulated using different generalized frameworks in \cite{
 \caption{Parareal convergence for the example of a harmonic oscillator with $k = 1\frac{\text{N}}{\text{m}}$. The coarse solver is Euler and the fine solver is RK4.}
 \label{oscillator}
 \end{figure}
+
+\subsection*{Stopping criteria}
+We assume the algorithm has converged enough when $\forall n: |u^{i+1}_n - u^i_n| < \varepsilon$. Other criteria also exist.\cite{speedup}
+
+\subsection*{Theoretical speed-up}
+
+A derivation of the theoretical speedup is presented in \cite{speedup} (Section 2.3), which we use here. It calculates the speed-up when running even the coarse solver partially in parallel, we simplify it with running $\mathcal{C}$ serially. 
+
+To find the theoretical speed-up of the algorithm, let's compute the time required by the parareal algorithm, $T_\text{parareal}$, and the time $T_\text{serial}$ taken to compute the solution by running the fine integrator serially. 
+
+Assume running $\mathcal{F}$ over any segment $[t_n, t_{n+1}]$ takes $T_\mathcal{F}$ and running $\mathcal{C}$ over any segment takes $T_\mathcal{C}$. Then computing $\mathcal{F}$ serially takes
+$$
+T_\text{serial} \approx NT_\mathcal{F}
+$$
+while using the parareal algorithm, with $N$ CPUs, we have
+$$
+T_\text{parareal} \approx NT_\mathcal{C} + \sum_{i=1}^{k}\left(T_\mathcal{F} + NT_\mathcal{C}\right) = kT_\mathcal{F} + (k+1)NT_\mathcal{C}
+$$
+
+Finally, the speed-up $S_\text{parareal}$ can be computed as
+\begin{multline}
+S_\text{parareal} = \frac{T_\text{serial}}{T_\text{parareal}} = \\\frac{NT_\mathcal{F}}{kT_\mathcal{F} + (k+1)NT_\mathcal{C}} = \\\left(\frac{k}{N} + (k+1)\frac{T_\mathcal{C}}{T_\mathcal{F}}\right)^{-1}
+\end{multline}
+
+Thus, to reach a high speed-up, we want the ratio $\frac{T_\mathcal{C}}{T_\mathcal{F}}$ to be small while also keeping the number of required iterations $k$ small.\cite{speedup}
+
+The algorithm always converges in at most $N+1$ iterations, however, that is not useful (and takes even more time), because we have to converge at a significantly smaller number of iterations to gain any real speed-up.\cite{speedup}
 
 \section{Application to particle simulations}
 The purpose of this paper is to examine the potential in the use of the parareal method for long running simulations such as simulations of the solar system. 
@@ -99,13 +127,10 @@ It is also possible to use a similar algorithm to the parareal algorithm using a
 
 \subsection{Choice of the coarse and fine integrators}
 \begin{itemize}
-    \item We use the Velocity Verlet method as the coarse integrator for its favourable stability properties {\color{red} TODO: source} and the classic fourth-order Runge-Kutta method (RK4) as the fine integrator for its precision {\color{red} TODO: source}. 
+    \item We use the Velocity Verlet method as the coarse integrator for its favourable stability properties {\color{red} TODO: source} and the classic fourth-order Runge-Kutta method (RK4) as the fine integrator for its precision. 
     \item Two symplectic methods could be used, however, due to the nature of the parareal algorithm, the resulting parareal integration would not necessarily be symplectic. A modified parareal algorithm that preserves the symplectic property, shown in \cite{symplecticparareal}, also exists, however it is beyond the scope of this paper.
     \item An adaptive step size fine integrator with error control would be an option, such as the Dormand-Prince RK45 method. However, since the method can have very different execution times (depending on the step size required to reach desired accuracy), which could potentially be an issue when paralellizing the code, RK4 was used for simplicity.
 \end{itemize}
-
-\subsection{Stopping criteria}
-We assume the algorithm has converged when the maximum distance between the states of two consecutive iterations is smaller than some $\varepsilon$. We use $\varepsilon = 10^{-3}\text{ AU}$.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_2.eps}}
@@ -114,7 +139,7 @@ We assume the algorithm has converged when the maximum distance between the stat
 \end{figure}
 
 \section{Implementation and experiments}
-Two implementations have been created, first a reference implementation in Python and then a faster one in C++ with OpenMP. 
+Two implementations have been created, first a reference implementation in Python and then a faster one in C++ with OpenMP. {\color{red} TODO: rewrite}
 
 In case we would want to use a substantially higher number of CPUs, we would have to use a different framework, such as MPI. However, due to the higher complexity and difficulty of such an implementation, an easier approach using OpenMP was used in this project for the present time instead.
 
@@ -132,27 +157,33 @@ Multiple experiments were ran on a cluster in order to get a more reproducible e
 \label{energy}
 \end{figure}
 
+\begin{comment}
 \begin{table*}[htbp]
 \caption{Comparison of running times taken by different configurations of the simulator. 
 $N_{\text{Coarse}}$ and $N_{\text{Fine}}$ refer to the number of steps of the coarse and the fine integrators respectively. 
-To allow comparison with the classic sequential algorithm using only the fine integrator, $N_{\text{Final}}$ shows the resulting number of steps (for parareal it is equal to the number of segments times $N_\text{Fine}$).
-\newline The programs were run on the machines of the zia.cerit-sc.cz cluster owned by CERIT-SC/MU, a part of the MetaCentrum organization, each equiped with two AMD EPYC 7662 (2x 64 Core) 3.31 GHz processors.}
+To allow comparison with the classic sequential algorithm using only the fine integrator, $N_{\text{Final}}$ shows the resulting number of steps (for parareal it is equal to the number of segments times $N_\text{Fine}$).}
 \begin{center}
 \begin{tabular}{ccrrrrrrrrcc}
 \toprule
-Program & Time &  n CPUs & Segments & $N_\text{Coarse}$ & $N_{\text{Fine}}$ & $N_{\text{Final}}$ & Iters $^{\mathrm{a}}$ & Abs. error $^{\mathrm{b}}$ & Rel. error $^{\mathrm{c}}$ & CPU time & Runtime \\
+Program & Environment & n CPUs & Segments & $N_\text{Coarse}$ & $N_{\text{Fine}}$ & $N_{\text{Final}}$ & Iters $^{\mathrm{a}}$ & Abs. err. $^{\mathrm{b}}$ & Rel. err. $^{\mathrm{c}}$ & CPU time & Runtime \\
 \midrule
-parareal & $10^4\text{days}$ & 32 & 32 &  $5\times10^3$ &  $5\times10^4$ & $16\times10^5$ & 1 & 0.0030 AU & 0.97\% & 00:05:33 & 00:00:35 \\
-parareal & $10^4\text{days}$ & 16 & 16 & $1\times10^4$ & $1\times10^5$ & $16\times10^5$ & 2 & 0.0031 AU & 1.03\% & 00:08:12 & 00:01:07 \\
-serial & $10^4\text{days}$ & 1 & 1 & N/A & $16\times10^5$ & $16\times10^5$ & N/A & 0 AU & 0\% & 00:02:34 & 00:02:34 \\
+\multicolumn{11}{c}{Solar system $10^4\text{days}$} \\
+\midrule[.025em]
+parareal & zia.cerit-sc.cz$^{\mathrm{d}}$ & 32 & 32 & $5\times10^3$ &  $5\times10^4$ & $16\times10^5$ & 1 & 0.0030 AU & 0.97\% & 00:05:33 & 00:00:35 \\
+parareal & zia.cerit-sc.cz$^{\mathrm{d}}$ & 16 & 16 & $1\times10^4$ & $1\times10^5$ & $16\times10^5$ & 2 & 0.0031 AU & 1.03\% & 00:08:12 & 00:01:07 \\
+serial & zia.cerit-sc.cz$^{\mathrm{d}}$ & 1 & 1 & N/A & $16\times10^5$ & $16\times10^5$ & N/A & 0 AU & 0\% & 00:02:34 & 00:02:34 \\
 \bottomrule
-\multicolumn{11}{l}{$^{\mathrm{b}}$ Number of iterations required for convergence ($\varepsilon = 10^{-3}\text{ AU}$)} \\
-\multicolumn{11}{l}{$^{\mathrm{c}}$ Maximum difference from the corresponding serial computation across the trajectory} \\
-\multicolumn{11}{l}{$^{\mathrm{d}}$ Maximum relative error across the trajectory compared to the serial computation} \\
+\multicolumn{11}{l}{$^{\mathrm{a}}$ Number of iterations required for convergence ($\varepsilon = 10^{-3}\text{ AU}$)} \\
+\multicolumn{11}{l}{$^{\mathrm{b}}$ Maximum difference from the corresponding serial computation across the trajectory} \\
+\multicolumn{11}{l}{$^{\mathrm{c}}$ Maximum relative error across the trajectory compared to the serial computation} \\
+\multicolumn{11}{l}{$^{\mathrm{d}}$ The programs were run on the machines of the zia.cerit-sc.cz cluster } \\
+\multicolumn{11}{l}{owned by CERIT-SC/MU, a part of the MetaCentrum organization,} \\
+\multicolumn{11}{l}{each equiped with two AMD EPYC 7662 (2x 64 Core) 3.31 GHz processors.}
 \end{tabular}
 \label{runtimes}
 \end{center}
 \end{table*}
+\end{comment}
 
 \section{Summary and discussion}
 
@@ -169,6 +200,7 @@ supported by the Ministry of Education, Youth and Sports of the Czech Republic.
 6-578 (2007), [Online]. Available: https://doi.org/10.1007/978-3-642-56118-4\_12
 \bibitem{symplecticparareal}Bal, G. \& Wu, Q. Symplectic Parareal. {\em Domain Decomposition Methods In Science And Engineering XVII}. pp. 401-408 (2008)
 \bibitem{parallelsolar}Saha, P., Stadel, J. \& Tremaine, S. A Parallel Integration Method for Solar System Dynamics. {\em The Astronomical Journal}. \textbf{114} pp. 409 (1997,7), http://dx.doi.org/10.1086/118485
+\bibitem{speedup}Pentland, K., Tamborrino, M., Sullivan, T., Buchanan, J. \& Appel, L. GParareal: a time-parallel ODE solver using Gaussian process emulation. {\em Statistics And Computing}. 33, 23 (2022,12), [Online]. Available: https://doi.org/10.1007/s11222-022-10195-y
 \bibitem{farfuture}Gander, M. Is it possible to predict the far future before the near future is known accurately?. {\em Snapshots Of Modern Mathematics From Oberwolfach; 2019}. pp. 21 (2019), [Online]. Available: http://publications.mfo.de/handle/mfo/3693
 \bibitem{parareal2}Gander, M. \& Vandewalle, S. ``Analysis of the Parareal Time‐Parallel Time‐Integration Method.'' SIAM Journal On Scientific Computing. 29, 556-578 (2007), [Online]. Available: https://doi.org/10.1137/05064607X
 \end{thebibliography}

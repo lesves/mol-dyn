@@ -1,3 +1,0 @@
-m.1.out.txt filter=lfs diff=lfs merge=lfs -text
-m.16.out.txt filter=lfs diff=lfs merge=lfs -text
-m.32.out.txt filter=lfs diff=lfs merge=lfs -text
