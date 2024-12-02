@@ -42,7 +42,7 @@ namespace parareal { namespace integration {
 					const types::vec3 a0 = state.a[i];
 					state.compute_force(i);
 					const types::vec3 a1 = state.a[i];
-					state.v[i] += (a0+a1)/2. * dt;
+					state.v[i] += 0.5*dt*a0 + 0.5*dt*a1;
 				}
 			}
 		}

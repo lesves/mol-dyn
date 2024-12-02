@@ -7,7 +7,7 @@
 
 #include "types.hpp"
 
-#define SMOOTHING_EPS 0
+//#define SMOOTHING_EPS 0
 
 
 namespace parareal { namespace state {
@@ -62,9 +62,9 @@ namespace parareal { namespace state {
 				auto diff = x[i]-x[j];
 				auto dist = diff.norm();
 
-				auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
+				//auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
 
-				a[i] += -cfg->G * cfg->m[j] * diff / std::pow(smoothed, 3.);
+				a[i] += -cfg->G * cfg->m[j] * diff / std::pow(dist, 3.);
 			}
 		}
 
@@ -80,9 +80,9 @@ namespace parareal { namespace state {
 					auto diff = x[i]-x[j];
 					auto dist = diff.norm();
 
-					auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
+					//auto smoothed = std::sqrt(dist*dist + SMOOTHING_EPS*SMOOTHING_EPS);
 
-					energy += -cfg->G * cfg->m[i] * cfg->m[j] / smoothed / 2.;
+					energy += -cfg->G * cfg->m[i] * cfg->m[j] / dist / 2.;
 				}
 			}
 
