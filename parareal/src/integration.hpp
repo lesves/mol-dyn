@@ -13,29 +13,37 @@ namespace parareal { namespace integration {
 		void operator()(double t0, double t1, state::State& state) {
 			double dt = t1-t0;
 
+			state.compute_forces();
 			for (std::size_t i = 0; i < state.size(); ++i) {
-				state.compute_force(i);
 				state.x[i] += state.v[i]*dt;
 				state.v[i] += state.a[i]*dt;
 			}
 		}
 	};
 
-	class VerletStep {
+	class VelocityVerlet {
+	private:
+		std::size_t num_steps;
+
 	public:
+		VelocityVerlet(std::size_t num_steps): num_steps(num_steps) {};
+
 		void operator()(double t0, double t1, state::State& state) {
-			double dt = t1-t0;
+			double dt = (t1-t0)/num_steps;
+			state.compute_forces();
 
-			for (std::size_t i = 0; i < state.size(); ++i) {
-				state.compute_force(i);
-				const types::vec3 a0 = state.a[i];
+			for (std::size_t it = 0; it < num_steps; ++it) {
+				for (std::size_t i = 0; i < state.size(); ++i) {
+					state.x[i] += dt * (state.v[i] + 0.5*state.a[i]*dt);
+				}
 
-				state.x[i] += state.v[i]*dt + a0/2.*dt*dt;
-
-				state.compute_force(i);
-				const types::vec3 a1 = state.a[i];
-
-				state.v[i] += (a0+a1)/2. * dt;
+				for (std::size_t i = 0; i < state.size(); ++i) {
+					// assumption: accelerations don't depend on velocities
+					const types::vec3 a0 = state.a[i];
+					state.compute_force(i);
+					const types::vec3 a1 = state.a[i];
+					state.v[i] += (a0+a1)/2. * dt;
+				}
 			}
 		}
 	};
@@ -45,46 +53,55 @@ namespace parareal { namespace integration {
 		void operator()(double t0, double t1, state::State& state) {
 			double dt = t1-t0;
 
-			types::vec3 k1_v;
-			types::vec3 k2_v;
-			types::vec3 k3_v;
-			types::vec3 k4_v;
-			types::vec3 k1_x;
-			types::vec3 k2_x;
-			types::vec3 k3_x;
-			types::vec3 k4_x;
+			std::vector<types::vec3> k1_v(state.size());
+			std::vector<types::vec3> k2_v(state.size());
+			std::vector<types::vec3> k3_v(state.size());
+			std::vector<types::vec3> k4_v(state.size());
+			std::vector<types::vec3> k1_x(state.size());
+			std::vector<types::vec3> k2_x(state.size());
+			std::vector<types::vec3> k3_x(state.size());
+			std::vector<types::vec3> k4_x(state.size());
 
 			state::State tmp = state;
 
+			tmp.compute_forces();
+
 			for (std::size_t i = 0; i < tmp.size(); ++i) {
-				tmp.compute_force(i);
+				k1_v[i] = tmp.a[i]*dt;
+				k1_x[i] = tmp.v[i]*dt;
 
-				k1_v = tmp.a[i]*dt;
-				k1_x = tmp.v[i]*dt;
+				tmp.x[i] = state.x[i] + k1_x[i]/2.;
+				tmp.v[i] = state.v[i] + k1_v[i]/2.;
+			}
 
-				tmp.x[i] = state.x[i] + k1_x/2.;
-				tmp.v[i] = state.v[i] + k1_v/2.;
-				tmp.compute_force(i);
+			tmp.compute_forces();
 
-				k2_v = tmp.a[i]*dt;
-				k2_x = tmp.v[i]*dt;
+			for (std::size_t i = 0; i < tmp.size(); ++i) {
+				k2_v[i] = tmp.a[i]*dt;
+				k2_x[i] = tmp.v[i]*dt;
 
-				tmp.x[i] = state.x[i] + k2_x/2.;
-				tmp.v[i] = state.v[i] + k2_v/2.;
-				tmp.compute_force(i);
+				tmp.x[i] = state.x[i] + k2_x[i]/2.;
+				tmp.v[i] = state.v[i] + k2_v[i]/2.;
+			}
 
-				k3_v = tmp.a[i]*dt;
-				k3_x = tmp.v[i]*dt;
+			tmp.compute_forces();
 
-				tmp.x[i] = state.x[i] + k3_x;
-				tmp.v[i] = state.v[i] + k3_v;
-				tmp.compute_force(i);
+			for (std::size_t i = 0; i < tmp.size(); ++i) {
+				k3_v[i] = tmp.a[i]*dt;
+				k3_x[i] = tmp.v[i]*dt;
 
-				k4_v = tmp.a[i]*dt;
-				k4_x = tmp.v[i]*dt;
+				tmp.x[i] = state.x[i] + k3_x[i];
+				tmp.v[i] = state.v[i] + k3_v[i];
+			}
 
-		        state.v[i] += (k1_v + 2.*k2_v + 2.*k3_v + k4_v)/6.;
-		        state.x[i] += (k1_x + 2.*k2_x + 2.*k3_x + k4_x)/6.;
+			tmp.compute_forces();
+
+			for (std::size_t i = 0; i < tmp.size(); ++i) {
+				k4_v[i] = tmp.a[i]*dt;
+				k4_x[i] = tmp.v[i]*dt;
+
+		        state.v[i] += (k1_v[i] + 2.*k2_v[i] + 2.*k3_v[i] + k4_v[i])/6.;
+		        state.x[i] += (k1_x[i] + 2.*k2_x[i] + 2.*k3_x[i] + k4_x[i])/6.;
 			}
 		}
 	};
@@ -120,14 +137,16 @@ namespace parareal { namespace integration {
 		}
 	};
 
-	template<typename Step>
-	FixedStepSolver<FixedStepSolver<Step>> solver_with_log_period(std::size_t num_steps, std::size_t log_period) {
+	using RK4Fixed = FixedStepSolver<RK4Step>;
+
+	template<typename FixedStepSolverType>
+	FixedStepSolver<FixedStepSolverType> solver_with_log_period(std::size_t num_steps, std::size_t log_period) {
 		if (num_steps % log_period) {
 			throw std::runtime_error("num_steps must be divisible by log_period");
 		}
-		auto inner = FixedStepSolver<Step>(log_period);
+		auto inner = FixedStepSolverType(log_period);
 		auto num_steps_ = num_steps/log_period;
-		return FixedStepSolver<FixedStepSolver<Step>>(num_steps_, inner);
+		return FixedStepSolver<FixedStepSolverType>(num_steps_, inner);
 	}
 
 	template<typename CoarseSolver, typename FineSolver>

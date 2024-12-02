@@ -45,6 +45,12 @@ namespace parareal { namespace state {
 			return x.size();
 		}
 
+		void compute_forces() {
+			for (std::size_t i = 0; i < size(); ++i) {
+				compute_force(i);
+			}
+		}
+
 		void compute_force(std::size_t i) {
 			a[i].clear();
 

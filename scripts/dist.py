@@ -35,6 +35,10 @@ if __name__ == "__main__":
 	print(f"max rel err: {rel_errs.max() * 100:.2f} %")
 	print(f"mean rel err: {rel_errs.mean() * 100:.2f} %")
 
-	#plt.hist(rel_errs[:, 1])
+	print(f"ratio of outliers (rel. err. > 0.3): {(rel_errs > 0.3).sum()/len(rel_errs)}")
+
+	for i in range(rel_errs.shape[1]):
+		plt.hist(rel_errs[:, i], bins=100, label=f"{i}")
+	plt.legend()
 	#plt.plot(np.arange(len(data_1)), rel_errs[:, 1])
-	#plt.show()
+	plt.show()

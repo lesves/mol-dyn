@@ -145,6 +145,15 @@ In case we would want to use a substantially higher number of CPUs, we would hav
 
 Multiple experiments were ran on a cluster in order to get a more reproducible environment. The resulting run times were collected in Table \ref{runtimes}. For visualizations of the simulation results see Figures \ref{sim} and \ref{energy}.
 
+Let's derive the expected speed-up of our program and compare it with the measured speed-up. To simplify the calculation, we will only estimate it using the number of function evaluations. For Velocity Verlet, we have $T_\mathcal{C} = 1N_\mathcal{C}$, where $N_\mathcal{C}$ is the number of steps of the coarse integrator. RK4 takes four function evaluations, so we have $T_\mathcal{F} = 4N_\mathcal{F}$. If the fine integrator does 10 times more steps than the coarse one, we have $\frac{N_\mathcal{C}}{N_\mathcal{F}} = \frac{1}{10}$. Thus, we have
+$$
+S_\text{parareal} = \left(\frac{k}{N} + (k+1)\frac{1N_\mathcal{C}}{4N_\mathcal{F}}\right)^{-1} = \left(\frac{k}{N} + \frac{k+1}{40}\right)^{-1}
+$$
+When we choose the number of processors (and the number of segments), $N = 16$ and we converge within one iteration, we have
+$$
+S_\text{parareal} = \left(\frac{1}{16} + \frac{1}{20}\right)^{-1} \approx 8.89
+$$
+
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_3.eps}}
 \caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal on 32 CPUs. For more information, see Table \ref{runtimes}.}

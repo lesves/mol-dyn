@@ -51,7 +51,7 @@ int main(int argc, char** argv) {
 		if (args["serial"].as<bool>()) {
 			auto steps = nseg*fsteps;
 
-			auto solver = parareal::integration::solver_with_log_period<parareal::integration::RK4Step>(steps, log_period);
+			auto solver = parareal::integration::solver_with_log_period<parareal::integration::RK4Fixed>(steps, log_period);
 			res = solver.integrate_verbose(0, time, initial);
 		} else {
 			res = parareal::integration::parareal(
@@ -61,8 +61,8 @@ int main(int argc, char** argv) {
 				nseg,                                // number of segments (must be divisible by the number of ranks)
 				args["max-iters"].as<std::size_t>(), // maximum of parareal iters, 
 				args["eps"].as<double>(),            // eps for convergence
-				parareal::integration::FixedStepSolver<parareal::integration::VerletStep>(csteps),
-				parareal::integration::solver_with_log_period<parareal::integration::RK4Step>(fsteps, log_period)
+				parareal::integration::VelocityVerlet(csteps),
+				parareal::integration::solver_with_log_period<parareal::integration::RK4Fixed>(fsteps, log_period)
 			);
 		}
 
