@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -N parareal_64_64_test
+#PBS -N parareal_16_16_test
 #PBS -l select=1:ncpus=16:ompthreads=16:mem=1gb:cluster=zia
 #PBS -l walltime=00:12:00
 
