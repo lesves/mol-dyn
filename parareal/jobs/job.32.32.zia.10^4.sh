@@ -1,6 +1,6 @@
 #!/bin/bash
-#PBS -N parareal_1_32_test
-#PBS -l select=1:ncpus=1:ompthreads=1:mem=1gb:cluster=zenon
+#PBS -N parareal_32_32_test
+#PBS -l select=1:ncpus=32:ompthreads=32:mem=1gb:cluster=zia
 #PBS -l walltime=00:05:00
 
 DATADIR=/storage/praha1/home/skywalker/mol-dyn/parareal
@@ -9,7 +9,7 @@ DATADIR=/storage/praha1/home/skywalker/mol-dyn/parareal
 source $DATADIR/jobs/32.10^5.cfg.sh
 
 # run
-OUT="out.serial.32.zenon.10^5.txt"
-FLAGS="--serial"
+OUT="out.32.32.zia.10^5.txt"
+FLAGS=""
 
 source $DATADIR/jobs/base_job.sh
