@@ -7,7 +7,7 @@ DATADIR=/storage/praha1/home/skywalker/mol-dyn/parareal
 
 # config
 NSEG=4
-MAX_ITERS=1
+MAX_ITERS=2
 COARSE_STEPS=20000
 FINE_STEPS=200000
 TIME=10000
