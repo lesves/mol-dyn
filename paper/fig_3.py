@@ -8,7 +8,7 @@ import ref.planets as planets
 
 
 def fig_3():
-	data = np.loadtxt("results/m.32.out.txt")
+	data = np.loadtxt("results/out.32.32.zia.10^4.txt")
 	data, energy = data[:, :-2], data[:, -2:]
 
 	data = data.reshape((data.shape[0], data.shape[1]//3, 3))

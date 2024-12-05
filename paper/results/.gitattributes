@@ -1,0 +1,5 @@
+out.16.16.zia.10^4.txt filter=lfs diff=lfs merge=lfs -text
+out.32.32.zia.10^4.txt filter=lfs diff=lfs merge=lfs -text
+out.4.4.zia.10^4.txt filter=lfs diff=lfs merge=lfs -text
+out.64.64.zia.10^4.txt filter=lfs diff=lfs merge=lfs -text
+out.serial.zia.10^4.txt filter=lfs diff=lfs merge=lfs -text
