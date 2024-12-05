@@ -26,5 +26,4 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(cxxopts)
 target_link_libraries( ${TARGET_NAME} PUBLIC cxxopts )
 
-configure_file(../vis.py vis.py COPYONLY)
 execute_process(COMMAND sh -c "echo \"*\" > .gitignore")
