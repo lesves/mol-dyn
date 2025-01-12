@@ -15,4 +15,4 @@ echo "$PBS_JOBID is running on node `hostname -f`" >> $DATADIR/results/jobs_info
 # run program
 module add python
 pip3 install matplotlib numpy
-python3 $DATADIR/timetest.py
+python3 $DATADIR/timetest.py $DATADIR/results/timetest-result.txt
