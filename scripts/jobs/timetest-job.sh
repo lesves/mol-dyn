@@ -1,5 +1,5 @@
 #!/bin/bash
-#PBS -N parareal_16_16_test
+#PBS -N parareal_timetest_16
 #PBS -l select=1:ncpus=16:ompthreads=16:mem=1gb:cluster=zia
 #PBS -l walltime=00:23:00
 
@@ -15,4 +15,4 @@ echo "$PBS_JOBID is running on node `hostname -f`" >> $DATADIR/results/jobs_info
 # run program
 module add python
 pip3 install matplotlib numpy
-python3 $DATADIR/arraytest.py
+python3 $DATADIR/timetest.py

@@ -7,8 +7,8 @@ import subprocess
 import time
 import os
 
-
-PARAREAL_PATH = Path(__file__).parent.parent / "parareal"
+DIR = Path(__file__).parent
+PARAREAL_PATH = DIR.parent / "parareal"
 PROGRAM_PATH = PARAREAL_PATH / "build" / "parareal"
 INPUT_PATH = PARAREAL_PATH / "planets.cfg"
 
@@ -50,7 +50,8 @@ data = np.array([
 	res,
 	times
 ])
-np.savetxt("results/timetest-result.txt", data)
+np.savetxt(DIR / "results" / "timetest-result.txt", data)
+
 
 #fig, ax = plt.subplots(2,)
 
