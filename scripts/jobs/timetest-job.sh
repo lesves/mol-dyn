@@ -1,7 +1,7 @@
 #!/bin/bash
 #PBS -N parareal_timetest_16
 #PBS -l select=1:ncpus=16:ompthreads=16:mem=1gb:cluster=zia
-#PBS -l walltime=00:23:00
+#PBS -l walltime=00:42:00
 
 DATADIR=/storage/praha1/home/skywalker/mol-dyn/scripts/
 

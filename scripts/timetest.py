@@ -16,11 +16,11 @@ PROGRAM_PATH = PARAREAL_PATH / "build" / "parareal"
 INPUT_PATH = PARAREAL_PATH / "planets.cfg"
 
 SEGMENTS = 16
-TIME = 365
-FINE = 500
+TIME = 365*2
+FINE = 800
 EPS = 1e-3
 
-COARSE_RANGE = range(0, FINE+1, 1)
+COARSE_RANGE = range(0, FINE+1, 8)
 
 N_TRIALS = 10
 
