@@ -9,13 +9,13 @@ DATADIR=/storage/praha1/home/skywalker/mol-dyn/parareal
 NSEG=32
 MAX_ITERS=16
 COARSE_STEPS=10000 # COARSE_STEPS does nothing
-FINE_STEPS=50000 # We intentionally lower the number of steps to decrease precision
+FINE_STEPS=90000 # We intentionally lower the number of steps to decrease precision
 TIME=10000
 EPS=1e-3
 LOG_PERIOD=100
 
 # run
-OUT="out.serial.prec2.zia.10^4.txt"
+OUT="out.serial.prec4.zia.10^4.txt"
 FLAGS="--serial"
 
 source $DATADIR/jobs/base_job.sh
