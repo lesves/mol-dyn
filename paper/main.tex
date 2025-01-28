@@ -13,13 +13,14 @@
 \usepackage{comment}
 \usepackage[thinc]{esdiff}
 \usepackage{xurl}
+\usepackage{pbalance}
 
 \begin{document}
 
-\title{Parallel-in-time methods for Particle Simulations}
+\title{Parallel-in-time Methods for Particle Simulations}
 
 \author{\IEEEauthorblockN{Lukáš Veškrna}
-\IEEEauthorblockA{\textit{Technical University Munich} \\
+\IEEEauthorblockA{\textit{Technical University Munich}\\ \textit{\& Charles University} \\
 Munich, Germany \\
 lukas.veskrna@gmail.com}
 }
@@ -27,7 +28,7 @@ lukas.veskrna@gmail.com}
 \maketitle
 
 \begin{abstract}
-The purpose of this paper is to examine the applications of parallel-in-time integration in particle simulations, in particular the parareal algorithm, by developing a simple simulator in the field of solar system dynamics utilizing parallel-in-time integration. We then test and measure the real speed-up and compare it with the expectations derived from theory.
+The purpose of this article is to examine the behavior of parallel-in-time integration in particle simulations, in particular the parareal algorithm, by developing a simple simulator in the field of solar system dynamics utilizing parallel-in-time integration. We present the results of experiments measuring the run times, which we then compare with expectations derived from theory.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -40,7 +41,11 @@ Particle simulations are an important tool for understanding many different kind
 
 Simulating those systems usually requires a huge amount of computations, which can take a very long time. Some of these computations can be run in parallel in order to reduce the computation time. There has been a lot of focus in parallelizing these simulations through the spatial domain, which allows us to run bigger simulations while taking the same time.
 
-There do, however, also exist algorithms that allow us to parallelize simulations in the time domain. This could be very useful for running smaller simulations through a very long timespan. This is of interest for example in solar system dynamics.\footnote{Also in other fields such as molecular dynamics \cite{moldyn} but solar system simulations are a relatively good example.} If we want to learn more about the behavior of mostly stable planetary orbits, we have to simulate a long time. Thus, parallel-in-time algorithms can be employed. \cite{parallelsolar}
+There do, however, also exist algorithms that allow us to parallelize simulations in the time domain. This could be very useful for running smaller simulations through a very long timespan. 
+
+In this article, we will focus on the fitting example of solar system dynamics, although many applications could be found also in other fields, such as molecular dynamics\cite{moldyn}.
+
+If we want to learn more about the behavior of mostly stable planetary orbits, we have to simulate a long time. Thus, parallel-in-time algorithms can be employed. \cite{parallelsolar}
 
 In particle simulations, we are often under the hood numerically solving an ODE in the form:
 $$
@@ -54,11 +59,11 @@ The integration part is the part which usually is dependent on some previous tim
 
 The parareal algorithm was introduced by Lions, Maday and Turinici in 2001. \cite{parareal}\footnote{The original paper is in French but it does include a basic description in English.} It achieves parallel-in-time integration using two types of integrators. A coarse solver $\mathcal{C}$ is used first to roughly estimate the solution, while a fine (but potentially expensive) solver $\mathcal{F}$ is then used to fill in the gaps in this estimated trajectory.
 
-Supposing we integrate from time $t_0$ to $T$, we split this interval into $N$ segments of size $\Delta T = \frac{T-t_0}{N}$. We denote $u_0, u_1\dots u_N$ the states of the system in times $t_0, t_1\dots t_N$ with $t_n = t_0 + n\Delta T$ (so $t_0 = t_0$ and $t_N = T$).
+Supposing we integrate from time $t_0$ to $T$, we split this interval into $N$ segments of size $\Delta T = \frac{T-t_0}{N}$. We denote $u_0, u_1\dots u_N$ the states of the system in times $t_0, t_1\dots t_N$ with $t_n = t_0 + n\Delta T$ (so $t_0 = t_0$ and $t_N = T$).\footnote{The solvers can also use their own smaller subdivisions (e.g. different step sizes) but the parareal algorithm does not interact with those subdivisions.}
 
 The algorithm works in iterations. The 0th iteration is used to initialize the algorithm, while the subsequent iterations improve the result of the previous iteration.
 
-In the 0th iteration, we use the coarse solver to compute $u_1\dots u_n$ sequentially. For every $0 \leq n < N$ we do
+In the 0th iteration, we use the coarse solver to compute $u_1\dots u_N$ sequentially. For every $0 \leq n < N$ we do
 $$
 u^0_{n+1} = \mathcal{C}(t_n, t_n+\Delta T, u^0_n)
 $$
@@ -142,20 +147,22 @@ It is also possible to use a similar algorithm to the parareal algorithm using a
 \section{Implementation and experiments}
 
 \subsection{Implementation}
-An implementation in C++ using OpenMP for the parallelization was written.\footnote{The code is available at \url{https://github.com/lesves/mol-dyn}.} In case we would want to use a substantially higher number of CPUs, we would have to use a different framework, such as MPI. However, due to the higher complexity and difficulty of such  implementation, an simpler approach with OpenMP was used in this project instead.
+An implementation in C++ using OpenMP for the parallelization was written.\footnote{The code is available at \url{https://github.com/lesves/mol-dyn}.} In case we would want to use a substantially higher number of CPUs, we would have to use a different framework, such as MPI. However, due to the higher complexity and difficulty of such  implementation, a simpler approach with OpenMP was used in this project instead.
 
-\subsection{Experiments (for run time comparison)}
-Multiple experiments with the same initial conditions and same step size were ran on a cluster in order to get a more reproducible and comparable environment. 
+\subsection{Experiments: The environment}
+All experiments were ran on a cluster in order to get a more reproducible and comparable environment. 
 
 The experimental runs were conducted on the zia.cerit-sc.cz cluster owned by CERIT-SC/MU, a part of the MetaCentrum organization. Each computer in the cluster is equiped with two AMD EPYC 7662 (2x 64 Core) 3.31 GHz processors.
 
-A very small step size was used, so all of the runs would converge within the same number of iterations (one iteration).
+\subsection{Experiment I: Measured run time and expected run time comparison}
+
+Multiple experiments with the same initial conditions and same step size were conducted. A very small step size was used, so all of the runs would converge within the same number of iterations (one iteration\footnote{This choice is explained in the next experiment (Experiment II), where the observations suggest that convergence within one iteration can be the situation with optimal run time.}). For comparison, also a serial version (not using the parareal algorithm) was ran with the same initial conditions and step size.
 
 The resulting run times were collected in Table \ref{runtimes}. For visualizations of the simulation results see Figure \ref{sim} and \ref{energy}.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_3.eps}}
-\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal on 32 CPUs. For more information, see Table \ref{runtimes}.}
+\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal on 32 CPU cores. For more information, see Table \ref{runtimes}.}
 \label{sim}
 \end{figure}
 
@@ -165,8 +172,7 @@ The resulting run times were collected in Table \ref{runtimes}. For visualizatio
 \label{energy}
 \end{figure}
 
-\subsection{Run time comparison}
-Let's derive the expected speed-up and run time of our program and compare it with the measured run time. To simplify the calculation, we will only estimate it using the number of function evaluations. For Velocity Verlet, we have $T_\mathcal{C} = 1N_\mathcal{C}$, where $N_\mathcal{C}$ is the number of steps of the coarse integrator. RK4 takes four function evaluations, so we have $T_\mathcal{F} = 4N_\mathcal{F}$. If the fine integrator does 10 times more steps than the coarse one, we have $\frac{N_\mathcal{C}}{N_\mathcal{F}} = \frac{1}{10}$. Thus, we have
+Let's derive the expected speed-ups and run times of our program and compare it with the measured run times. To simplify the calculation, we will only estimate it using the number of function evaluations. For Velocity Verlet, we have $T_\mathcal{C} = 1N_\mathcal{C}$, where $N_\mathcal{C}$ is the number of steps of the coarse integrator. RK4 takes four function evaluations, so we have $T_\mathcal{F} = 4N_\mathcal{F}$. If the fine integrator does 10 times more steps than the coarse one, we have $\frac{N_\mathcal{C}}{N_\mathcal{F}} = \frac{1}{10}$. Thus, we have
 $$
 S_\text{parareal} = \left(\frac{k}{N} + (k+1)\frac{1N_\mathcal{C}}{4N_\mathcal{F}}\right)^{-1} = \left(\frac{k}{N} + \frac{k+1}{40}\right)^{-1}
 $$
@@ -179,31 +185,48 @@ We can compare this with the real measured speed-up, see Table \ref{runtimes}. W
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_5.eps}}
-\caption{Comparison of the expected run times (blue curve, computed from $S_\text{parareal}$ and the run time of the serial algorithm (red point)) and the real measured times with different numbers of CPUs (blue points). For more information, see Table \ref{runtimes}.}
+\caption{Comparison of the expected run times (blue curve, computed from $S_\text{parareal}$ and the run time of the serial algorithm (red point)) and the real measured times with different numbers of CPU cores (blue points). For more information, see Table \ref{runtimes}.}
 \label{speeds}
 \end{figure}
 
+\subsection{Experiment II: Run times, numbers of iterations and coarse solver steps}
+
+The second experiment shows how do run times and the numbers of iterations that the program takes to converge relate to the number of steps of the coarse solver. This observation can help with deciding what is the optimal number of steps to use for the coarse solver. We are interested primarily in the run time, however the number of iterations turns out to be a very important factor in the run time.
+
+A series of simulations with the same configuration but with different numbers of steps of the coarse solver ($N_\mathcal{C}$) were ran and the results are shown in figure \ref{timetest}. The parameter for the stopping criterion was fixed at $\varepsilon = 10^{-3}$ and we observe varying numbers of iterations required to reach this criterion.
+
+A key feature observed in figure \ref{timetest} are the ``spikes'' in the run times, that occur when a change in the number of required iterations changes. After every initial downward spike, there is always an upward trend. 
+
+Presumably, this shows that the run time depends primarily on the number of iterations and only secondarily on the number of steps of the coarse solver. The upward trends correspond to improving the coarse solver while not improving the number of iterations, which does not improve the computation time.
+
+From this, we can conjecture, that the optimal choice of the number of steps for the coarse solver is the smallest possible number such that parareal converges within one iteration (or in terms of step sizes, optimal choice of the step size is the biggest possible such that the algorithm converges in one iteration).
+
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\linewidth]{fig_6.eps}}
+\caption{Run time and number of iterations depending on the ratio of the numbers of steps of the coarse and fine solvers. It corresponds to a simulation of two years with final step size $\frac{2\times365\text{ day}}{800\times 16} \approx 0.057\text{ day}$ run on 16 cores (with $N_\mathcal{F} = 800$, $\mathcal{F}$ is once again RK4 and $\mathcal{C}$ is Velocity Verlet). It was averaged through 10 runs to reduce noise interfering with the small running times. The $\varepsilon$ for convergence was chosen as $\varepsilon = 10^{-3}$.}
+\label{timetest}
+\end{figure}
+
 \begin{table*}[htbp]
-\caption{Comparison of running times taken by different configurations of the simulator. 
-$N_\mathcal{C}$ and $N_\mathcal{F}$ refer to the number of steps of the coarse and the fine integrators respectively and $\Delta t_{\text{Final}}$ is the resulting step size.
+\caption{Comparison of running times taken by different configurations of the simulator for a planetary simulation of $10^4$ days.
+$N_\mathcal{C}$ and $N_\mathcal{F}$ refer to the number of steps of the coarse and the fine integrators respectively. The fine solver step numbers have been chosen specifically to preserve the step size of 0.003125 day. This step size was selected, so all the parareal runs converge within one iteration (with $\varepsilon = 10^{-3}\text{ AU}$). This number of iterations was chosen for easier comparison between the runs and it is a low number to achieve greater speed-up.
 The programs were run on the machines of the zia.cerit-sc.cz cluster owned by CERIT-SC/MU, a part of the MetaCentrum organization, each equiped with two AMD EPYC 7662 (2x 64 Core) 3.31 GHz processors.}
 \begin{center}
-\begin{tabular}{crrrrrrrrrcc}
+\begin{tabular}{crrrrrrrrcc}
 \toprule
-Program & Time & $n$ CPUs $^{\mathrm{a}}$ & $N_\mathcal{C}$ & $N_\mathcal{F}$ & $\Delta t_{\text{Final}}$ & Iters $^{\mathrm{b}}$ & Abs. err. $^{\mathrm{c}}$ & Rel. err. $^{\mathrm{d}}$ & CPU time & Real time \\
+Program & $n$ CPUs $^{\mathrm{a}}$ & $N_\mathcal{C}$ & $N_\mathcal{F}$ & Abs. err. $^{\mathrm{b}}$ & Rel. err. $^{\mathrm{c}}$ & CPU time & Real time \\
 \midrule
 %\multicolumn{11}{c}{Solar system $10^4\text{days}$} \\
 %\midrule[.025em]
-parareal & $10^4$ days & 64 & $0.5\times10^4$ &  $0.5\times10^5$ & 0.003125 day & 1 & 0.0110 AU & 3.60\% & 00:11:53 & 00:00:35 \\
-parareal & $10^4$ days & 32 & $1\times10^4$ &  $1\times10^5$ & 0.003125 day & 1 & 0.0110 AU & 3.60\% & 00:12:53 & 00:00:52 \\
-parareal & $10^4$ days & 16 & $2\times10^4$ &  $2\times10^5$ & 0.003125 day & 1 & 0.0109 AU & 3.60\% & 00:10:25 & 00:01:01 \\
-parareal & $10^4$ days & 4 & $8\times10^4$ &  $8\times10^5$ & 0.003125 day & 1 & 0.0109 AU & 3.57\% & 00:10:27 & 00:02:54 \\
-serial & $10^4$ days & 1 & N/A & $32\times10^5$ & 0.003125 day & N/A & 0 AU & 0\% & 00:05:01 & 00:05:01 \\
+parareal & 64 & $0.5\times10^4$ &  $0.5\times10^5$ & 0.0110 AU & 3.60\% & 00:11:53 & 00:00:35 \\
+parareal & 32 & $1\times10^4$ &  $1\times10^5$ & 0.0110 AU & 3.60\% & 00:12:53 & 00:00:52 \\
+parareal & 16 & $2\times10^4$ &  $2\times10^5$ & 0.0109 AU & 3.60\% & 00:10:25 & 00:01:01 \\
+parareal & 4 & $8\times10^4$ &  $8\times10^5$ & 0.0109 AU & 3.57\% & 00:10:27 & 00:02:54 \\
+serial & 1 & N/A & $32\times10^5$ & 0 AU & 0\% & 00:05:01 & 00:05:01 \\
 \bottomrule
-\multicolumn{11}{l}{$^{\mathrm{a}}$ The number of segments ($N$) is the same as the number of CPUs.} \\
-\multicolumn{11}{l}{$^{\mathrm{b}}$ Number of iterations required for convergence ($\varepsilon = 10^{-3}\text{ AU}$)} \\
-\multicolumn{11}{l}{$^{\mathrm{c}}$ Maximum difference from the corresponding serial computation across the trajectory} \\
-\multicolumn{11}{l}{$^{\mathrm{d}}$ Maximum relative error across the trajectory compared to the serial computation}
+\multicolumn{8}{l}{$^{\mathrm{a}}$ The number of segments ($N$) is the same as the number of CPUs.} \\
+\multicolumn{8}{l}{$^{\mathrm{b}}$ Maximum difference from the corresponding serial computation across the trajectory} \\
+\multicolumn{8}{l}{$^{\mathrm{c}}$ Maximum relative error across the trajectory compared to the serial computation}
 \end{tabular}
 \label{runtimes}
 \end{center}
@@ -212,11 +235,14 @@ serial & $10^4$ days & 1 & N/A & $32\times10^5$ & 0.003125 day & N/A & 0 AU & 0\
 \section{Summary and discussion}
 
 \subsection{Speed-up}
-We measured the run times of a fixed simulation with different numbers of CPUs and compared them with the theoretical expectations. As was visualized in Figure \ref{speeds}, we can observe that the measured run times show a trend similar to the expected run times (corresponding to the predicted speed-ups). 
+We measured the run times of a fixed simulation with different numbers of CPU cores and compared them with the theoretical expectations. As was visualized in Figure \ref{speeds}, we can observe that the measured run times show a trend similar to the expected run times (corresponding to the predicted speed-ups). 
 
 The implementation is consistently slower than the estimated run times, however, there are many factors that weren't considered in the speed-up estimation, for example we only took the function evaluations in the solvers into account. There are also other factors such as the synchronization costs of the OpenMP threads.
 
 In conclusion, we were able to achieve noticable speed-ups consistent with the theoretical foundation by using the parareal algorithm.
+
+\subsection{Spatial vs temporal parallelization}
+What configurations of the simulation size and the timespan benefit from parallel-in-time integration? How does spatial and temporal parallelization combine together? This is beyond scope of this article, however {\color{red} TODO}
 
 \subsection{Other particle simulations: Molecular dynamics}
 We evaluated parareal only in the example of our solar system. Those settings, however, have their own specifics, in particular, planets in our solar system follow orbits with very different periods, which makes them harder to simulate and require very small step sizes. 
@@ -230,7 +256,7 @@ Another particularly interesting method that could be used for molecular dynamic
 \section*{Acknowledgements}
 \addcontentsline{toc}{section}{Acknowledgements}
 
-I would like to thank my advisor, Samuel J. Newcome, M. Sc., for suggesting directions, providing valueable feedback and organising this amazing seminar.
+I would like to thank my advisor, Samuel J. Newcome, M. Sc. and all other participants of the Seminar in Methods for Molecular Dynamics, for suggesting directions, providing valueable feedback and organising this amazing seminar.
 
 Computational resources were provided by the e-INFRA CZ project (ID:90254),
 supported by the Ministry of Education, Youth and Sports of the Czech Republic.

@@ -22,7 +22,7 @@ EPS = 1e-3
 
 COARSE_RANGE = range(0, FINE+1, 8)
 
-N_TRIALS = 10
+N_TRIALS = 1
 
 
 def run_experiment():
