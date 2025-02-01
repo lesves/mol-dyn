@@ -1,8 +1,8 @@
 import matplotlib.pyplot as plt
 plt.style.use("timesnromanstyle.mplstyle")
-plt.rcParams.update({
-	"text.usetex": True,
-})
+#plt.rcParams.update({
+#	"text.usetex": True,
+#})
 import numpy as np
 
 import sys
@@ -24,7 +24,7 @@ def fig_4():
 	ax.plot(np.arange(len(energy))*log_interval * dt / year, energy.sum(axis=1), label="total energy")
 	ax.legend()
 	plt.xlabel("Time [year]")
-	plt.ylabel(r"Energy $\left[\textrm{M}_{\textrm{Earth}}\frac{\textrm{AU}^2}{\textrm{day}^2}\right]$")
+	plt.ylabel(r"Energy $\left[\mathrm{M}_{\mathrm{Earth}}\frac{\mathrm{AU}^2}{\mathrm{day}^2}\right]$")
 
 	plt.tight_layout()
 	plt.savefig("fig_4.eps", format="eps")
