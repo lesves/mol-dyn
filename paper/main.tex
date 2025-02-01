@@ -13,7 +13,25 @@
 \usepackage{comment}
 \usepackage[thinc]{esdiff}
 \usepackage{xurl}
-\usepackage{pbalance}
+
+% Character support
+\usepackage[english]{babel}
+
+% Turn off small-caps in table caption
+% I don't like it, I want to have a long caption
+% and this doesn't look good with it
+\usepackage{etoolbox}
+\makeatletter
+\patchcmd{\@makecaption}
+  {\scshape}
+  {}
+  {}
+  {}
+\makeatother
+
+%\renewcommand{\sfdefault}{cmss}
+%\renewcommand{\rmdefault}{cmr}
+%\renewcommand{\ttdefault}{cmt}
 
 \begin{document}
 
@@ -28,7 +46,7 @@ lukas.veskrna@gmail.com}
 \maketitle
 
 \begin{abstract}
-The purpose of this article is to examine the behavior of parallel-in-time integration in particle simulations, in particular the parareal algorithm, by developing a simple simulator in the field of solar system dynamics utilizing parallel-in-time integration. We present the results of experiments measuring the run times, which we then compare with expectations derived from theory.
+The purpose of this paper is to examine the behavior of parallel-in-time integration in particle simulations, in particular the parareal algorithm, by developing a simple simulator in the field of solar system dynamics utilizing parallel-in-time integration. We present the results of experiments measuring the run times of the simulation, which we then compare with expectations derived from theory.
 \end{abstract}
 
 \begin{IEEEkeywords}
@@ -41,9 +59,9 @@ Particle simulations are an important tool for understanding many different kind
 
 Simulating those systems usually requires a huge amount of computations, which can take a very long time. Some of these computations can be run in parallel in order to reduce the computation time. There has been a lot of focus in parallelizing these simulations through the spatial domain, which allows us to run bigger simulations while taking the same time.
 
-There do, however, also exist algorithms that allow us to parallelize simulations in the time domain. This could be very useful for running smaller simulations through a very long timespan. 
+There do, however, also exist algorithms that allow us to parallelize simulations in the time domain. This could be very useful for running smaller simulations through a very long timespan or with a very small step size. 
 
-In this article, we will focus on the fitting example of solar system dynamics, although many applications could be found also in other fields, such as molecular dynamics\cite{moldyn}.
+In this article, we will focus on the fitting example of solar system dynamics, although many applications could be found also in other fields, such as molecular dynamics. \cite{moldyn}
 
 If we want to learn more about the behavior of mostly stable planetary orbits, we have to simulate a long time. Thus, parallel-in-time algorithms can be employed. \cite{parallelsolar}
 
@@ -51,51 +69,53 @@ In particle simulations, we are often under the hood numerically solving an ODE 
 $$
 \diff{u(t)}{t} = f(t, u(t))
 $$
-where $f$ is the function describing our problem, $u(t)$ is the state of the system at time $t$ and we are given an initial condition $u(t_0) = u_0$.
+where $f$ is the function describing our problem, $u(t)$ is the state of the system at time $t$ and we are given an initial condition $u(t_0) = u_0$ (this type of problem is often called an initial value problem).
 
-The integration part is the part which usually is dependent on some previous time step and thus can't be easily parallelized. In order to make it parallelizable, multiple techniques were devised, one of them being the parareal algorithm.
+We typically solve this problem using a numerical method, that does a step in time of size $\Delta t$ and estimates $u(t_0+\Delta t)$. We then use this result to advance the computation further in time by taking more such steps.
 
-\section{The parareal algorithm}
+Thus, the integration is the part of the computation which usually is dependent on some previous time step and thus can't be easily parallelized. In order to make it parallelizable, multiple techniques were devised, one of them being the parareal algorithm.
 
-The parareal algorithm was introduced by Lions, Maday and Turinici in 2001. \cite{parareal}\footnote{The original paper is in French but it does include a basic description in English.} It achieves parallel-in-time integration using two types of integrators. A coarse solver $\mathcal{C}$ is used first to roughly estimate the solution, while a fine (but potentially expensive) solver $\mathcal{F}$ is then used to fill in the gaps in this estimated trajectory.
+\section{The Parareal Algorithm}
 
-Supposing we integrate from time $t_0$ to $T$, we split this interval into $N$ segments of size $\Delta T = \frac{T-t_0}{N}$. We denote $u_0, u_1\dots u_N$ the states of the system in times $t_0, t_1\dots t_N$ with $t_n = t_0 + n\Delta T$ (so $t_0 = t_0$ and $t_N = T$).\footnote{The solvers can also use their own smaller subdivisions (e.g. different step sizes) but the parareal algorithm does not interact with those subdivisions.}
+The parareal algorithm was introduced by Lions, Maday and Turinici in 2001. \cite{parareal}\footnote{The original paper is in French but it does include a basic description in English.} It achieves parallel-in-time integration using two types of integrators. A coarse solver $\mathcal{C}$ is used first to roughly estimate the solution\footnote{In the literature, the coarse solver is often denoted $\mathcal{G}$. However, I find it more intuitive to use $\mathcal{C}$ as in the word \textbf{c}oarse.}, while a fine (but potentially expensive) solver $\mathcal{F}$ is then used to further refine this estimated trajectory.
 
-The algorithm works in iterations. The 0th iteration is used to initialize the algorithm, while the subsequent iterations improve the result of the previous iteration.
+Supposing we integrate from time $t_0$ to $T$, we split this interval into $N$ segments of size $\Delta t = \frac{T-t_0}{N}$. We denote $u_0, u_1\dots u_N$ the states of the system in times $t_0, t_1\dots t_N$ with $t_n = t_0 + n\Delta t$ (so $t_0 = t_0$ and $t_N = T$).\footnote{The solvers can also use their own smaller subdivisions (e.g. different step sizes) but the parareal algorithm does not interact with those subdivisions.}
+
+The algorithm works in iterations. The 0th iteration is used to initialize the algorithm, while the subsequent iterations improve the result of the previous iteration. We use the notation $u^i_n$ to represent $u_n$ for iteration $i$.
 
 In the 0th iteration, we use the coarse solver to compute $u_1\dots u_N$ sequentially. For every $0 \leq n < N$ we do
 $$
-u^0_{n+1} = \mathcal{C}(t_n, t_n+\Delta T, u^0_n)
+u^0_{n+1} = \mathcal{C}(t_n, t_n+\Delta t, u^0_n)
 $$
 with $u^0_0 = u_0$, which is the initial state of the system.
 
-In every subsequent iteration $i+1$, we first calculate the results of the fine but expensive solver, $\mathcal{F}(t_n, t_n+\Delta T, u^{i}_n)$, for every $0 \leq n < N$ in parallel.
+In every subsequent iteration $i+1$, we first calculate the results of the fine but expensive solver, $\mathcal{F}(t_n, t_n+\Delta t, u^{i}_n)$, for every $0 \leq n < N$ in parallel.
 
 Then, we adjust the estimated states from the previous iteration with the following correction:
 \begin{multline}
-u^{i+1}_{n+1} = \mathcal{C}(t_n, t_n+\Delta T, u^{i+1}_n)\\ + \mathcal{F}(t_n, t_n+\Delta T, u^i_n)\\ - \mathcal{C}(t_n, t_n+\Delta T, u^{i}_n)
+u^{i+1}_{n+1} = \mathcal{C}(t_n, t_n+\Delta t, u^{i+1}_n)\\ + \mathcal{F}(t_n, t_n+\Delta t, u^i_n)\\ - \mathcal{C}(t_n, t_n+\Delta t, u^{i}_n)
 \end{multline}
 
-This is repeated until satisfactory convergence. It has been proven for example by \cite{parareal2} that for $i \to \infty$, we will converge to $u_{0\dots N}$ such that $u_{n+1} = \mathcal{F}(t_n, t_n+\Delta T, u_n)$, which is equivalent to computing the states at times $t_{0\dots N}$ with the fine solver sequentially.
+This is repeated until satisfactory convergence. It has been proven for example by \cite{parareal2} that for $i \to \infty$, we will converge to $u_{0\dots N}$ such that $u_{n+1} = \mathcal{F}(t_n, t_n+\Delta t, u_n)$, which is equivalent to computing the states at times $t_{0\dots N}$ with the fine solver sequentially.
 
 This method has been formulated using different generalized frameworks in \cite{parareal2}. They also extend the time interval paritioning to arbitrary partions, not only equally sized ones as in \cite{parareal}.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_1.eps}}
-\caption{Parareal convergence for the example of a harmonic oscillator with $k = 1\frac{\text{N}}{\text{m}}$. The coarse solver is Euler and the fine solver is RK4.}
+\caption{Parareal convergence for the example of a harmonic oscillator with $k = 1\frac{\text{N}}{\text{m}}$. The coarse solver is explicit Euler and the fine solver is RK4.}
 \label{oscillator}
 \end{figure}
 
 \subsection*{Stopping criteria}
-We assume the algorithm has converged enough when $\forall n\colon |u^{i+1}_n - u^i_n| < \varepsilon$. Other criteria also exist. \cite{speedup}
+We assume the algorithm has converged enough when $\forall n\colon \|u^{i+1}_n - u^i_n\| < \varepsilon$. Other criteria also exist. \cite{speedup}
 
 \subsection*{Theoretical speed-up}
 
-A derivation of the theoretical speedup is presented in \cite{speedup} (Section 2.3), which we use here. It calculates the speed-up when running even the coarse solver partially in parallel, we simplify it with running $\mathcal{C}$ serially (our implementation doesn't include this optimization). 
+A derivation of the theoretical speedup is presented in Pentland et al. \cite{speedup} (Section 2.3), which we use here. It calculates the speed-up when running even the coarse solver partially in parallel, we simplify it with running $\mathcal{C}$ serially (our implementation doesn't include this optimization). 
 
-To find the theoretical speed-up of the algorithm, let's compute the time required by the parareal algorithm, $T_\text{parareal}$, and the time $T_\text{serial}$ taken to compute the solution by running the fine integrator serially. 
+To find the theoretical speed-up of the algorithm, we compute the time required by the parareal algorithm, $T_\text{parareal}$, and the time $T_\text{serial}$ taken to compute the solution by running the fine integrator serially. 
 
-Assume running $\mathcal{F}$ over any segment $[t_n, t_{n+1}]$ takes $T_\mathcal{F}$ and running $\mathcal{C}$ over any segment takes $T_\mathcal{C}$. Then computing $\mathcal{F}$ serially takes
+If we assume running $\mathcal{F}$ over any segment $[t_n, t_{n+1}]$ takes $T_\mathcal{F}$ and running $\mathcal{C}$ over any segment takes $T_\mathcal{C}$, then computing $\mathcal{F}$ serially takes
 $$
 T_\text{serial} \approx NT_\mathcal{F}
 $$
@@ -103,6 +123,7 @@ while using the parareal algorithm, with $N$ CPUs, we have
 $$
 T_\text{parareal} \approx NT_\mathcal{C} + \sum_{i=1}^{k}\left(T_\mathcal{F} + NT_\mathcal{C}\right) = kT_\mathcal{F} + (k+1)NT_\mathcal{C}
 $$
+where $k$ is the number of iterations required for convergence.
 
 Finally, the speed-up $S_\text{parareal}$ can be computed as
 \begin{multline}
@@ -111,17 +132,17 @@ S_\text{parareal} = \frac{T_\text{serial}}{T_\text{parareal}} = \\\frac{NT_\math
 
 Thus, to reach a high speed-up, we want the ratio $\frac{T_\mathcal{C}}{T_\mathcal{F}}$ to be small while also keeping the number of required iterations $k$ small. \cite{speedup}
 
-The algorithm always converges in at most $N+1$ iterations, however, that is not useful (and takes even more time), because we have to converge at a significantly smaller number of iterations to gain any real speed-up. \cite{speedup}
+The algorithm always converges in at most $N$ iterations, because the exact initial condition propagates through all the $N$ segments, however, that is not useful (and takes even more time), because the algorithm has to converge at a significantly smaller number of iterations to gain any real speed-up. \cite{speedup} (2.3)
 
-\section{Application to particle simulations}
+\section{Application to Particle Simulations}
 The purpose of this paper is to examine the potential in the use of the parareal method for long running simulations such as simulations of the solar system. 
 
 \subsection{The particle simulation}
-We use a simple $n$-body particle simulation of the solar system with time complexity $\mathcal{O}(n^2)$, which we then integrate using the parareal method. This is inefficient for a large number of particles, however, our focus is on the parallel-in-time integration, therefore we use a simpler simulation.
+We use a simple $n$-body particle simulation of the solar system with time complexity $\mathcal{O}(n^2)$, which we then integrate using the parareal method. This is inefficient for a large number of particles, however, our focus is on the parallel-in-time integration, not the optimizations required for a large number of particles, therefore we use a simpler simulation.
 
 Thus, we are integrating the following equation:
 $$
-\diff{\mathbf{u}(t)}{t} = f(t, \mathbf{u}(t)) = f(t, (\mathbf{x}(t), \mathbf{v}(t))) = (\mathbf{v}(t), \mathbf{a}(t))
+\diff{u(t)}{t} = f(t, u(t)) = f(t, (x(t), v(t))) = (v(t), a(t))
 $$
 where 
 $$
@@ -129,25 +150,47 @@ a_i(t) = -G \sum_j m_j\frac{x_i(t)-x_j(t)}{\|x_i(t)-x_j(t)\|_2^3}
 $$
 where $m_j$ is the mass of the $j$-th particle. Acceleration is derived solely from Newton's law of universal gravitation.
 
-It is also possible to use a similar algorithm to the parareal algorithm using a simplified model instead of the coarse solver. This was done prior to the invention of parareal by \cite{parallelsolar} also in a solar system simulation, who obtained the coarse approximation by simulating only the interactions of Sun and other planets. \cite{parallelsolar} \cite{farfuture}
+It is also possible to use a similar algorithm to the parareal algorithm using a simplified model instead of the coarse solver. This was done prior to the invention of parareal by Saha et al. \cite{parallelsolar}, also in a solar system simulation, who obtained the coarse approximation by simulating only the interactions of Sun and other planets. \cite{parallelsolar} \cite{farfuture}
 
 \subsection{Choice of the coarse and fine integrators}
 \begin{itemize}
-    \item We use the Velocity Verlet method as the coarse integrator for its favourable stability properties with a small cost and the classic fourth-order Runge-Kutta method (RK4) as the fine integrator for its precision. 
+    \item We use the Velocity Verlet method as the coarse integrator for its favourable stability properties with a small cost and the classic fourth-order Runge-Kutta method (RK4) as the fine integrator for its precision. \cite{integration}
     \item Two symplectic methods could be used, however, due to the nature of the parareal algorithm, the resulting parareal integration would not necessarily be symplectic. A modified parareal algorithm that preserves the symplectic property, shown in \cite{symplecticparareal}, also exists, however it is beyond the scope of this paper.
     \item An adaptive step size fine integrator with error control would be an option, such as the Dormand-Prince RK45 method. However, since the method can have very different execution times (depending on the step size required to reach desired accuracy), which could potentially be an issue when paralellizing the code, RK4 was used for simplicity.
 \end{itemize}
 
+For completeness, the two selected integration methods are briefly described in the next paragraphs.
+\subsubsection{Velocity Verlet}
+
+\begin{align*}
+x(t+\Delta t) &= x(t) + v(t)\Delta t + \frac{1}{2}a(t)\Delta t^2 \\
+v(t+\Delta t) &= v(t) + \frac{a(t) + a(t+\Delta t)}{2}\Delta t
+\end{align*}
+Here $x(t)$, $v(t)$ and $a(t)$ represent approximations of the corresponding values (position, velocity, acceleration) at timestep $t$, $\Delta t$ is the time step size. Note that only one evaluation of $a$ per step suffices, because we can keep $a(t)$ from the last step. \cite{forverlet}
+
+\subsubsection{The classic fourth-order Runge-Kutta method (RK4)}
+\begin{align*}
+k_1 &= f(t, u(t)) \\
+k_2 &= f(t + \frac{\Delta t}{2}, u(t) + \Delta t\frac{k_1}{2}) \\
+k_3 &= f(t + \frac{\Delta t}{2}, u(t) + \Delta t\frac{k_2}{2}) \\
+k_4 &= f(t + \Delta t, u(t) + \Delta t k_3) \\
+u(t+\Delta t) &= u(t) + \frac{\Delta t}{6}\left(k_1 + 2k_2 + 2k_3 + k_4\right)
+\end{align*}
+where $u(t)$ represents the approximation of the state at time $t$. $\Delta t$ denotes the time step size. The method requires four acceleration computations per step. \cite{forrk4}
+
+\subsection{The initial conditions}
+The initial conditions for the simulation were generated with a python script using the astropy package. \cite{astropy}
+
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_2.eps}}
-\caption{Path of Mercury over the time of one Earth year in a parareal integrated simulation converging over multiple iterations of the parareal algorithm. Velocity verlet and RK4 are used with the same step size of $0.5\text{ day}$.}
+\caption{A more complex example to illustrate the behavior of the parareal algorithm: Path of Mercury over the time of one Earth year in a parareal integrated simulation converging over multiple iterations of the parareal algorithm. Velocity verlet and RK4 are used with the same step size of $0.5\text{ day}$.}
 \label{mercury}
 \end{figure}
 
-\section{Implementation and experiments}
+\section{Implementation and Experiments}
 
 \subsection{Implementation}
-An implementation in C++ using OpenMP for the parallelization was written.\footnote{The code is available at \url{https://github.com/lesves/mol-dyn}.} In case we would want to use a substantially higher number of CPUs, we would have to use a different framework, such as MPI. However, due to the higher complexity and difficulty of such  implementation, a simpler approach with OpenMP was used in this project instead.
+An implementation in C++ using OpenMP for the parallelization was written.\footnote{The code is available at \url{https://github.com/lesves/mol-dyn}.} In case we would want to use a substantially higher number of CPUs, we would have to use a different framework, such as MPI. However, due to the higher complexity of such implementation, a simpler approach with OpenMP was used in this project instead.
 
 \subsection{Experiments: The environment}
 All experiments were ran on a cluster in order to get a more reproducible and comparable environment. 
@@ -156,13 +199,13 @@ The experimental runs were conducted on the zia.cerit-sc.cz cluster owned by CER
 
 \subsection{Experiment I: Measured run time and expected run time comparison}
 
-Multiple experiments with the same initial conditions and same step size were conducted. A very small step size was used, so all of the runs would converge within the same number of iterations (one iteration\footnote{This choice is explained in the next experiment (Experiment II), where the observations suggest that convergence within one iteration can be the situation with optimal run time.}). For comparison, also a serial version (not using the parareal algorithm) was ran with the same initial conditions and step size.
+Multiple experiments with the same initial conditions and same step size were conducted. A very small step size was used, so all of the runs would converge within the same number of iterations (one iteration\footnote{This choice is explained in the next experiment (\textit{Experiment II}), where the observations suggest that convergence within one iteration possibly has optimal run time.}). For comparison, also a serial version (not using the parareal algorithm) was ran with the same initial conditions and step size.
 
 The resulting run times were collected in Table \ref{runtimes}. For visualizations of the simulation results see Figure \ref{sim} and \ref{energy}.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_3.eps}}
-\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal on 32 CPU cores. For more information, see Table \ref{runtimes}.}
+\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal. For more information, see Table \ref{runtimes}.}
 \label{sim}
 \end{figure}
 
@@ -185,21 +228,25 @@ We can compare this with the real measured speed-up, see Table \ref{runtimes}. W
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_5.eps}}
-\caption{Comparison of the expected run times (blue curve, computed from $S_\text{parareal}$ and the run time of the serial algorithm (red point)) and the real measured times with different numbers of CPU cores (blue points). For more information, see Table \ref{runtimes}.}
+\caption{Comparison of the expected run times (red curve, computed from $S_\text{parareal}$ and the run time of the serial algorithm (red ``x'' point)) and the real measured times with different numbers of CPU cores (blue points). For more information, see Table \ref{runtimes}.}
 \label{speeds}
 \end{figure}
+
+While we loose some accuracy with the parareal method, this is a parameter that can be controlled, for example using the converge parameter ($\varepsilon$) and the coarse solver accuracy. 
+
+If we instead approximate the simulation using a similar serial simulation with a lower number of steps, we get a substantially bigger error than the parareal algorithm while not improving the run time significantly. This is also shown in Table \ref{runtimes} (as ``serial (approx.)'').
 
 \subsection{Experiment II: Run times, numbers of iterations and coarse solver steps}
 
 The second experiment shows how do run times and the numbers of iterations that the program takes to converge relate to the number of steps of the coarse solver. This observation can help with deciding what is the optimal number of steps to use for the coarse solver. We are interested primarily in the run time, however the number of iterations turns out to be a very important factor in the run time.
 
-A series of simulations with the same configuration but with different numbers of steps of the coarse solver ($N_\mathcal{C}$) were ran and the results are shown in figure \ref{timetest}. The parameter for the stopping criterion was fixed at $\varepsilon = 10^{-3}$ and we observe varying numbers of iterations required to reach this criterion.
+A series of simulations with the same configuration but with different numbers of steps of the coarse solver ($N_\mathcal{C}$) were ran and the results are shown in Figure \ref{timetest}. The parameter for the stopping criterion was fixed at $\varepsilon = 10^{-3}$ and we observe varying numbers of iterations required to reach this criterion.
 
-A key feature observed in figure \ref{timetest} are the ``spikes'' in the run times, that occur when a change in the number of required iterations changes. After every initial downward spike, there is always an upward trend. 
+A key feature observed in Figure \ref{timetest} are the ``spikes'' in the run times, that occur when a change in the number of required iterations changes. After every initial downward spike, there is always an upward trend. 
 
 Presumably, this shows that the run time depends primarily on the number of iterations and only secondarily on the number of steps of the coarse solver. The upward trends correspond to improving the coarse solver while not improving the number of iterations, which does not improve the computation time.
 
-From this, we can conjecture, that the optimal choice of the number of steps for the coarse solver is the smallest possible number such that parareal converges within one iteration (or in terms of step sizes, optimal choice of the step size is the biggest possible such that the algorithm converges in one iteration).
+From this, we can conjecture, that (in the case of our simulation) the optimal choice of the number of steps for the coarse solver (in the sense of the smallest run time with a fixed $\varepsilon$) is the smallest possible number such that parareal converges within one iteration (or in terms of step sizes, optimal choice of the step size is the biggest possible such that the algorithm converges in one iteration).
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_6.eps}}
@@ -207,51 +254,71 @@ From this, we can conjecture, that the optimal choice of the number of steps for
 \label{timetest}
 \end{figure}
 
+\begin{figure}[htbp]
+\centerline{\includegraphics[width=\linewidth]{fig_7.eps}}
+\caption{This bonus figure shows the numbers of iterations that the parareal algorithm with $N = 16$ requires to converge for a simulation of 365 days with the fine solver step size of $\frac{T-t_0}{NN_\mathcal{F}} = \frac{365\text{ days}}{16\times100}$ for different ratios of $\frac{N_\mathcal{C}}{N_\mathcal{F}}$ and different values of the convergence criterion parameter, $\varepsilon$.}
+\label{arraytest}
+\end{figure}
+
 \begin{table*}[htbp]
 \caption{Comparison of running times taken by different configurations of the simulator for a planetary simulation of $10^4$ days.
-$N_\mathcal{C}$ and $N_\mathcal{F}$ refer to the number of steps of the coarse and the fine integrators respectively. The fine solver step numbers have been chosen specifically to preserve the step size of 0.003125 day. This step size was selected, so all the parareal runs converge within one iteration (with $\varepsilon = 10^{-3}\text{ AU}$). This number of iterations was chosen for easier comparison between the runs and it is a low number to achieve greater speed-up.
+$N_\mathcal{C}$ and $N_\mathcal{F}$ refer to the number of steps of the coarse and the fine integrators respectively (within one segment). The fine solver step numbers have been chosen specifically to preserve the step size of 0.003125 day. This step size was selected, so all the parareal runs converge within one iteration (with $\varepsilon = 10^{-3}\text{ AU}$). This number of iterations was chosen for easier comparison between the runs and to achieve greater speed-up (see \textit{Experiment II}).
 The programs were run on the machines of the zia.cerit-sc.cz cluster owned by CERIT-SC/MU, a part of the MetaCentrum organization, each equiped with two AMD EPYC 7662 (2x 64 Core) 3.31 GHz processors.}
 \begin{center}
-\begin{tabular}{crrrrrrrrcc}
+\begin{tabular}{crrrrrrrrrcc}
 \toprule
-Program & $n$ CPUs $^{\mathrm{a}}$ & $N_\mathcal{C}$ & $N_\mathcal{F}$ & Abs. err. $^{\mathrm{b}}$ & Rel. err. $^{\mathrm{c}}$ & CPU time & Real time \\
+Program & $n$ CPUs $^{\mathrm{a}}$ & $N_\mathcal{C}$ & $N_\mathcal{F}$ & $\Delta t_\mathcal{F}$ $^{\mathrm{b}}$ & Abs. err. $^{\mathrm{c}}$ & Rel. err. $^{\mathrm{d}}$ & CPU time & Real time \\
 \midrule
 %\multicolumn{11}{c}{Solar system $10^4\text{days}$} \\
 %\midrule[.025em]
-parareal & 64 & $0.5\times10^4$ &  $0.5\times10^5$ & 0.0110 AU & 3.60\% & 00:11:53 & 00:00:35 \\
-parareal & 32 & $1\times10^4$ &  $1\times10^5$ & 0.0110 AU & 3.60\% & 00:12:53 & 00:00:52 \\
-parareal & 16 & $2\times10^4$ &  $2\times10^5$ & 0.0109 AU & 3.60\% & 00:10:25 & 00:01:01 \\
-parareal & 4 & $8\times10^4$ &  $8\times10^5$ & 0.0109 AU & 3.57\% & 00:10:27 & 00:02:54 \\
-serial & 1 & N/A & $32\times10^5$ & 0 AU & 0\% & 00:05:01 & 00:05:01 \\
+parareal & 64 & $0.5\times10^4$ &  $0.5\times10^5$ & 0.003125 day & 0.0110 AU & 3.60\% & 00:11:53 & 00:00:35 \\
+parareal & 32 & $1\times10^4$ &  $1\times10^5$ & 0.003125 day & 0.0110 AU & 3.60\% & 00:12:53 & 00:00:52 \\
+parareal & 16 & $2\times10^4$ &  $2\times10^5$ & 0.003125 day & 0.0109 AU & 3.60\% & 00:10:25 & 00:01:01 \\
+parareal & 4 & $8\times10^4$ &  $8\times10^5$ & 0.003125 day & 0.0109 AU & 3.57\% & 00:10:27 & 00:02:54 \\
+serial (base) & 1 & N/A & $32\times10^5$ & 0.003125 day & 0 AU & 0\% & 00:05:01 & 00:05:01 \\
+serial (approx.) $^{\mathrm{e}}$ & 1 & N/A & $0.9\times32\times10^5$ & 0.003472 day & 6.7580 AU & 256.25\% & 00:04:38 & 00:04:38 \\
 \bottomrule
 \multicolumn{8}{l}{$^{\mathrm{a}}$ The number of segments ($N$) is the same as the number of CPUs.} \\
-\multicolumn{8}{l}{$^{\mathrm{b}}$ Maximum difference from the corresponding serial computation across the trajectory} \\
-\multicolumn{8}{l}{$^{\mathrm{c}}$ Maximum relative error across the trajectory compared to the serial computation}
+\multicolumn{8}{l}{$^{\mathrm{b}}$ The resulting step size (fine solver step size). For parareal, it can be calculated as $\frac{T-t_0}{NN_\mathcal{F}}$} \\
+\multicolumn{8}{l}{$^{\mathrm{c}}$ Maximum difference from the base serial computation across the trajectory} \\
+\multicolumn{8}{l}{$^{\mathrm{d}}$ Maximum relative error across the trajectory compared to the base serial computation} \\
+\multicolumn{8}{l}{$^{\mathrm{e}}$ A serial approximation of the base serial simulation using a bigger step size.}
 \end{tabular}
 \label{runtimes}
 \end{center}
 \end{table*}
 
-\section{Summary and discussion}
+\section{Summary and Discussion}
 
 \subsection{Speed-up}
-We measured the run times of a fixed simulation with different numbers of CPU cores and compared them with the theoretical expectations. As was visualized in Figure \ref{speeds}, we can observe that the measured run times show a trend similar to the expected run times (corresponding to the predicted speed-ups). 
+The run times of a fixed simulation with different numbers of CPU cores were measured in Experiment I and compared with the theoretical expectations. As was visualized in Figure \ref{speeds}, we can observe that the measured run times show a trend similar to the expected run times (corresponding to the predicted speed-ups). 
 
 The implementation is consistently slower than the estimated run times, however, there are many factors that weren't considered in the speed-up estimation, for example we only took the function evaluations in the solvers into account. There are also other factors such as the synchronization costs of the OpenMP threads.
 
 In conclusion, we were able to achieve noticable speed-ups consistent with the theoretical foundation by using the parareal algorithm.
 
+By comparing parareal with an approximating serial run using a bigger step size (see ''serial (approx.)`` in Table \ref{runtimes}), we have also shown that in this case, the parareal algorithm beats simply approximating the solution using a smaller step size in both accuracy and run time. 
+
+The error of the parareal algorithm can be controlled using parameters like the threshold for the convergence criterion ($\varepsilon$) and in some cases the coarse solver step size.
+
+And finally in Experiment II, we attempted to find the optimal setting (with the smallest run time and a fixed $\varepsilon$) of the course solver step size for our simulation. The results are presented in Figure \ref{timetest}. The result is a prediction of the optimal coarse solver step size for our simulation, which is the biggest possible such that the algorithm converges in one iteration.
+
 \subsection{Spatial vs temporal parallelization}
-What configurations of the simulation size and the timespan benefit from parallel-in-time integration? How does spatial and temporal parallelization combine together? This is beyond scope of this article, however {\color{red} TODO}
+
+In some situations it is not that clear as in our case whether is it better to use spatial or temporal parallelization or both. This is beyond the scope of this article, however, there has been research in this area.
+
+For example, Croce et al. presented a study using a simulation of unsteady Navier-Stokes equations for incompressible flow using parareal that is parallel both in time and space. They measured the speed-up with different numbers of cores being asigned to the spatial and temporal parallelization and shown that they can be combined to gain higher speed-up. \cite{spacetime}
 
 \subsection{Other particle simulations: Molecular dynamics}
-We evaluated parareal only in the example of our solar system. Those settings, however, have their own specifics, in particular, planets in our solar system follow orbits with very different periods, which makes them harder to simulate and require very small step sizes. 
+In molecular dynamics, there are potential applications for parallel-in-time integration, such as material science. \cite{moldyn} Or possibly simulating protein folding, which requires extremely small step sizes (as small as femtoseconds) and great amounts of computational power. \cite{protein}
 
-This is usually not present in molecular dynamics settings and thus we could expect a more stable behavior. This could be an interesting area to continue with this work.
+We evaluated parareal only in the example of our solar system. Those settings, however, have their own specifics, in particular, planets in our solar system follow orbits with very different periods, which makes them harder to simulate in the sense that if we simulate a single orbit of Neptune, we have to simulate many orbits of Mercury (in a simulation of all the planets), which requires very small step sizes to behave correctly. 
 
-On the other hand, we could further improve our solar system simulations by further specializing them as was done in \cite{parallelsolar} (a different coarse model simulating only the interactions of Sun and other planets was used instead of a course integrator). However, our intent is to study general particle simulations, so this would be beyond our scope.
+We could further improve our solar system simulations by further specializing them as was done in the work by Saha et al. \cite{parallelsolar} (a different coarse model simulating only the interactions of Sun and other planets was used instead of a course integrator). However, this would be too specific for solar system dynamics and wound not generalize well, so this is beyond our scope.
 
-Another particularly interesting method that could be used for molecular dynamics is also the symplectic parareal method described by \cite{symplecticparareal}, mentioned in an earlier section of this paper.
+These problems are usually not present in molecular dynamics settings and thus we could expect a more stable behavior. However, molecular dynamics present their own different challenges. This could be an interesting area to continue with this work.
+
+%Another particularly interesting method that could be used for molecular dynamics is also the symplectic parareal method described by \cite{symplecticparareal}, mentioned in an earlier section of this paper.
 
 \section*{Acknowledgements}
 \addcontentsline{toc}{section}{Acknowledgements}
@@ -261,15 +328,21 @@ I would like to thank my advisor, Samuel J. Newcome, M. Sc. and all other partic
 Computational resources were provided by the e-INFRA CZ project (ID:90254),
 supported by the Ministry of Education, Youth and Sports of the Czech Republic.
 
+\IEEEtriggeratref{9}
 \begin{thebibliography}{00}
-\bibitem{parareal}Lions, J., Maday, Y. \& Turinici, G. Résolution d'EDP par un schéma en temps «pararéel ». {\em Comptes Rendus De L'Académie Des Sciences - Series I - Mathematics}. \textbf{332}, 661-668 (2001), [Online]. Available: \url{https://www.sciencedirect.com/science/article/pii/S0764444200017936}
-\bibitem{parallelsolar}Saha, P., Stadel, J. \& Tremaine, S. A Parallel Integration Method for Solar System Dynamics. {\em The Astronomical Journal}. \textbf{114} pp. 409 (1997,7), \url{http://dx.doi.org/10.1086/118485}
+\bibitem{parareal}Lions, J., Maday, Y. \& Turinici, G. Résolution d'EDP par un schéma en temps «pararéel». {\em Comptes Rendus De L'Académie Des Sciences - Series I - Mathematics}. \textbf{332}, 661-668 (2001), [Online]. Available: \url{https://www.sciencedirect.com/science/article/pii/S0764444200017936}
+\bibitem{parallelsolar}Saha, P., Stadel, J. \& Tremaine, S. A Parallel Integration Method for Solar System Dynamics. {\em The Astronomical Journal}. \textbf{114} pp. 409 (1997,7), [Online]. Available: \url{http://dx.doi.org/10.1086/118485}
 \bibitem{speedup}Pentland, K., Tamborrino, M., Sullivan, T., Buchanan, J. \& Appel, L. GParareal: a time-parallel ODE solver using Gaussian process emulation. {\em Statistics And Computing}. 33, 23 (2022,12), [Online]. Available: \url{https://doi.org/10.1007/s11222-022-10195-y}
 \bibitem{parareal2}Gander, M. \& Vandewalle, S. ``Analysis of the Parareal Time‐Parallel Time‐Integration Method.'' SIAM Journal On Scientific Computing. 29, 556-578 (2007), [Online]. Available: \url{https://doi.org/10.1137/05064607X}
 \bibitem{farfuture}Gander, M. Is it possible to predict the far future before the near future is known accurately?. {\em Snapshots Of Modern Mathematics From Oberwolfach; 2019}. pp. 21 (2019), [Online]. Available: \url{http://publications.mfo.de/handle/mfo/3693}
 \bibitem{symplecticparareal}Bal, G. \& Wu, Q. Symplectic Parareal. {\em Domain Decomposition Methods In Science And Engineering XVII}. pp. 401-408 (2008)
-\bibitem{moldyn}Baffico, L., Bernard, S., Maday, Y., Turinici, G. \& Zérah, G. Parallel-in-time molecular-dynamics simulations. {\em Physical Review E}. \textbf{66} (2002,11), http://dx.doi.org/10.1103/physreve.66.057701
-
+\bibitem{moldyn}Baffico, L., Bernard, S., Maday, Y., Turinici, G. \& Zérah, G. Parallel-in-time molecular-dynamics simulations. {\em Physical Review E}. \textbf{66} (2002,11), [Online]. Available: \url{http://dx.doi.org/10.1103/physreve.66.057701}
+\bibitem{integration}Leimkuhler, B., Reich, S. \& Skeel, R. Integration Methods for Molecular Dynamics. {\em Mathematical Approaches To Biomolecular Structure And Dynamics}. pp. 161-185 (1996), [Online]. Available: \url{https://doi.org/10.1007/978-1-4612-4066-2_10}
+\bibitem{forverlet}Swope, W., Andersen, H., Berens, P. \& Wilson, K. A computer simulation method for the calculation of equilibrium constants for the formation of physical clusters of molecules: Application to small water clusters. {\em The Journal Of Chemical Physics}. \textbf{76}, 637-649 (1982,1), [Online]. Available: \url{https://doi.org/10.1063/1.442716}
+\bibitem{forrk4}Steven C. Chapra, R. Numerical Methods for Engineers. (McGraw-Hill Education,2014)
+\bibitem{spacetime}Croce, R., Ruprecht, D. \& Krause, R. Parallel-in-Space-and-Time Simulation of the Three-Dimensional, Unsteady Navier-Stokes Equations for Incompressible Flow. {\em Modeling, Simulation And Optimization Of Complex Processes - HPSC 2012}. pp. 13-23 (2014)
+\bibitem{protein}Chodera, J., Swope, W., Pitera, J. \& Dill, K. Long‐Time Protein Folding Dynamics from Short‐Time Molecular Dynamics Simulations. {\em Multiscale Modeling \& Simulation}. \textbf{5}, 1214-1226 (2006), [Online]. Available: \url{https://doi.org/10.1137/06065146X}
+\bibitem{astropy}Astropy Collaboration, Price-Whelan, A., Lim, P., Earl, N., Starkman, N., Bradley, L., Shupe, D., Patil, A., Corrales, L., Brasseur, C., Nöthe, M., Donath, A., Tollerud, E., Morris, B., Ginsburg, A., Vaher, E., Weaver, B., Tocknell, J., Jamieson, W., Van Kerkwijk, M., Robitaille, T., Merry, B., Bachetti, M., Günther, H., Aldcroft, T., Alvarado-Montes, J., Archibald, A., Bódi, A., Bapat, S., Barentsen, G., Bazán, J., Biswas, M., Boquien, M., Burke, D., Cara, D., Cara, M., Conroy, K., Conseil, S., Craig, M., Cross, R., Cruz, K., D'Eugenio, F., Dencheva, N., Devillepoix, H., Dietrich, J., Eigenbrot, A., Erben, T., Ferreira, L., Foreman-Mackey, D., Fox, R., Freij, N., Garg, S., Geda, R., Glattly, L., Gondhalekar, Y., Gordon, K., Grant, D., Greenfield, P., Groener, A., Guest, S., Gurovich, S., Handberg, R., Hart, A., Hatfield-Dodds, Z., Homeier, D., Hosseinzadeh, G., Jenness, T., Jones, C., Joseph, P., Kalmbach, J., Karamehmetoglu, E., Kałuszyński, M., Kelley, M., Kern, N., Kerzendorf, W., Koch, E., Kulumani, S., Lee, A., Ly, C., Ma, Z., MacBride, C., Maljaars, J., Muna, D., Murphy, N., Norman, H., O'Steen, R., Oman, K., Pacifici, C., Pascual, S., Pascual-Granado, J., Patil, R., Perren, G., Pickering, T., Rastogi, T., Roulston, B., Ryan, D., Rykoff, E., Sabater, J., Sakurikar, P., Salgado, J., Sanghi, A., Saunders, N., Savchenko, V., Schwardt, L., Seifert-Eckert, M., Shih, A., Jain, A., Shukla, G., Sick, J., Simpson, C., Singanamalla, S., Singer, L., Singhal, J., Sinha, M., Sipőcz, B., Spitler, L., Stansby, D., Streicher, O., Šumak, J., Swinbank, J., Taranu, D., Tewary, N., Tremblay, G., Val-Borro, M., Van Kooten, S., Vasović, Z., Verma, S., De Miranda Cardoso, J., Williams, P., Wilson, T., Winkel, B., Wood-Vasey, W., Xue, R., Yoachim, P., Zhang, C., Zonca, A. \& Astropy Project Contributors The Astropy Project: Sustaining and Growing a Community-oriented Open-source Project and the Latest Major Release (v5.0) of the Core Package. {\em The Astrophysical Journal}. \textbf{935}, e167 (2022,8)
 \end{thebibliography}
 
 \end{document}

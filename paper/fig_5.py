@@ -12,7 +12,7 @@ def fig_5():
 	ys = (1/xs + 1/20) * times[0]
 	plt.plot(xs, ys, "r")
 
-	plt.scatter(ncpus[:1], times[:1], color="C3")
+	plt.scatter(ncpus[:1], times[:1], color="C3", marker="x")
 	plt.scatter(ncpus[1:], times[1:], color="C0")
 
 	plt.ylabel("Runtime [s]")

@@ -4,11 +4,11 @@ import sys
 
 
 def compare(parareal_outfile, serial_outfile):
-	data_1 = np.loadtxt(sys.argv[1])
+	data_1 = np.loadtxt(parareal_outfile)
 	data_1, energy_1 = data_1[:, :-2], data_1[:, -2:]
 	data_1 = data_1.reshape((data_1.shape[0], data_1.shape[1]//3, 3))
 
-	data_2 = np.loadtxt(sys.argv[2])
+	data_2 = np.loadtxt(serial_outfile)
 	data_2, energy_2 = data_2[:, :-2], data_2[:, -2:]
 	data_2 = data_2.reshape((data_2.shape[0], data_2.shape[1]//3, 3))
 
