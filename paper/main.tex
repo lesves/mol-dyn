@@ -201,17 +201,17 @@ The experimental runs were conducted on the zia.cerit-sc.cz cluster owned by CER
 
 Multiple experiments with the same initial conditions and the same step size were conducted. A very small step size was used, so all of the runs would converge within the same number of iterations (one iteration\footnote{This choice is explained in the next experiment (\textit{Experiment II}), where the observations suggest that convergence within one iteration possibly has optimal run time.}). For comparison, also a serial version (not using the parareal algorithm) was run with the same initial conditions and step size.
 
-The resulting run times were collected in Table \ref{runtimes}. For visualizations of the simulation results see Figure \ref{sim} and \ref{energy}.
+The resulting run times were collected in Table~\ref{runtimes}. For visualizations of the simulation results see Figures~\ref{sim}~and~\ref{energy}.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_3.eps}}
-\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal. For more information, see Table \ref{runtimes}.}
+\caption{Trajectory computed in the simulation of $10^4\text{ days}$ of the solar system using parareal. For more information, see Table~\ref{runtimes}.}
 \label{sim}
 \end{figure}
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_4.eps}}
-\caption{Conservation of energy in the simulation. Same simulation as in Figure \ref{sim}. With a small enough step size, even a non-symplectic integrator like RK4 can preserve energy for some number of time steps.}
+\caption{Conservation of energy in the simulation. Same simulation as in Figure~\ref{sim}. With a small enough step size, even a non-symplectic integrator like RK4 can preserve energy for some number of time steps.}
 \label{energy}
 \end{figure}
 
@@ -224,25 +224,25 @@ $$
 S_\text{parareal} = \left(\frac{1}{16} + \frac{1}{20}\right)^{-1} \approx 8.89
 $$
 
-We can compare this with the real measured speed-up, see Table \ref{runtimes}. We observe that in reality, the program runs around 5 times faster with 16 threads. We can also compare the expected speed-up $S_\text{parareal}$ for other numbers of CPUs, see Figure \ref{speeds}.
+We can compare this with the real measured speed-up, see Table~\ref{runtimes}. We observe that in reality, the program runs around 5 times faster with 16 threads. We can also compare the expected speed-up $S_\text{parareal}$ for other numbers of CPUs, see Figure~\ref{speeds}.
 
 \begin{figure}[htbp]
 \centerline{\includegraphics[width=\linewidth]{fig_5.eps}}
-\caption{Comparison of the expected run times (red curve, computed from $S_\text{parareal}$ and the run time of the serial algorithm (red ``x'' point)) and the real measured times with different numbers of CPU cores (blue points). For more information, see Table \ref{runtimes}.}
+\caption{Comparison of the expected run times (red curve, computed from $S_\text{parareal}$ and the run time of the serial algorithm (red ``x'' point)) and the real measured times with different numbers of CPU cores (blue points). For more information, see Table~\ref{runtimes}.}
 \label{speeds}
 \end{figure}
 
 While we lose some accuracy with the parareal method, this is a parameter that can be controlled, for example using the converge parameter ($\varepsilon$) and the coarse solver accuracy. 
 
-If we instead approximate the simulation using a similar serial simulation with a lower number of steps, we get a substantially bigger error than the parareal algorithm while not improving the run time significantly. This is also shown in Table \ref{runtimes} (as ``serial (approx.)'').
+If we instead approximate the simulation using a similar serial simulation with a lower number of steps, we get a substantially bigger error than the parareal algorithm while not improving the run time significantly. This is also shown in Table~\ref{runtimes} (as ``serial (approx.)'').
 
 \subsection{Experiment II: Run times, numbers of iterations and coarse solver steps}
 
 The second experiment shows how run times and the numbers of iterations that the program takes to converge relate to the number of steps of the coarse solver. This observation can help with deciding what is the optimal number of steps to use for the coarse solver. We are interested primarily in the run time, however the number of iterations turns out to be a very important factor in the run time.
 
-A series of simulations with the same configuration but with different numbers of steps of the coarse solver ($N_\mathcal{C}$) were run and the results are shown in Figure \ref{timetest}. The parameter for the stopping criterion was fixed at $\varepsilon = 10^{-3}$ and we observe varying numbers of iterations required to reach this criterion.
+A series of simulations with the same configuration but with different numbers of steps of the coarse solver ($N_\mathcal{C}$) were run and the results are shown in Figure~\ref{timetest}. The parameter for the stopping criterion was fixed at $\varepsilon = 10^{-3}$ and we observe varying numbers of iterations required to reach this criterion.
 
-A key feature observed in Figure \ref{timetest} are the ``spikes'' in the run times, that occur when a change in the number of required iterations changes. After every initial downward spike, there is always an upward trend. 
+A key feature observed in Figure~\ref{timetest} are the ``spikes'' in the run times, that occur when a change in the number of required iterations changes. After every initial downward spike, there is always an upward trend. 
 
 Presumably, this shows that the run time depends primarily on the number of iterations and only secondarily on the number of steps of the coarse solver. The upward trends correspond to improving the coarse solver while not improving the number of iterations, which does not improve the computation time.
 
@@ -291,17 +291,17 @@ serial (approx.) $^{\mathrm{e}}$ & 1 & N/A & $0.9\times32\times10^5$ & 0.003472 
 \section{Summary and Discussion}
 
 \subsection{Speed-up}
-The run times of a fixed simulation with different numbers of CPU cores were measured in Experiment I and compared with the theoretical expectations. As was visualized in Figure \ref{speeds}, we can observe that the measured run times show a trend similar to the expected run times (corresponding to the predicted speed-ups). 
+The run times of a fixed simulation with different numbers of CPU cores were measured in Experiment I and compared with the theoretical expectations. As was visualized in Figure~\ref{speeds}, we can observe that the measured run times show a trend similar to the expected run times (corresponding to the predicted speed-ups). 
 
 The implementation is consistently slower than the estimated run times; however, many factors were not considered in the speed-up estimation, for example, in the solvers we only took into account the function evaluations. There are also other factors such as the synchronization costs of the OpenMP threads.
 
 In conclusion, we were able to achieve noticeable speed-ups consistent with the theoretical foundation by using the parareal algorithm.
 
-By comparing parareal with an approximating serial run using a bigger step size (see ''serial (approx.)`` in Table \ref{runtimes}), we have also shown that in this case, the parareal algorithm beats simply approximating the solution using a smaller step size in both accuracy and run time. 
+By comparing parareal with an approximating serial run using a bigger step size (see ''serial (approx.)`` in Table~\ref{runtimes}), we have also shown that in this case, the parareal algorithm beats simply approximating the solution using a smaller step size in both accuracy and run time. 
 
 The error of the parareal algorithm can be controlled using parameters like the threshold for the convergence criterion ($\varepsilon$) and in some cases the coarse solver step size.
 
-Finally, in Experiment II, we attempted to find the optimal setting (with the smallest run time and a fixed $\varepsilon$) of the course solver step size for our simulation. The results are presented in Figure \ref{timetest}. The result is a prediction of the optimal coarse solver step size for our simulation, which is the biggest possible such that the algorithm converges in one iteration.
+Finally, in Experiment II, we attempted to find the optimal setting (with the smallest run time and a fixed $\varepsilon$) of the course solver step size for our simulation. The results are presented in Figure~\ref{timetest}. The result is a prediction of the optimal coarse solver step size for our simulation, which is the biggest possible such that the algorithm converges in one iteration.
 
 \subsection{Spatial vs temporal parallelization}
 
